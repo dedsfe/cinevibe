@@ -17,7 +17,9 @@ import {
   Plus,
   ThumbsUp,
   Volume2,
-  VolumeX
+  VolumeX,
+  Loader2,
+  ExternalLink
 } from 'lucide-react';
 import { useTMDB, fetchCategories, getBackdropUrl, getPosterUrl, genreMap } from '../hooks/useTMDB';
 import { useMyList } from '../hooks/useDatabase';
@@ -245,6 +247,10 @@ const MovieModal = ({ movie, onClose }) => {
                   className="modal-btn-play"
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
+                  onClick={() => {
+                    if (onClose) onClose();
+                    setSelectedWatchMovie(movie);
+                  }}
                 >
                   <Play size={24} fill="currentColor" />
                   Assistir
@@ -351,6 +357,179 @@ const getProviderLink = (providerName, movieTitle) => {
   };
   
   return providerLinks[providerName] || `https://www.google.com/search?q=${encodedTitle}+onde+assistir`;
+};
+
+const WatchModal = ({ movie, onClose }) => {
+  const [embedUrl, setEmbedUrl] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [searching, setSearching] = useState(false);
+  const [foundLink, setFoundLink] = useState(null);
+
+  useEffect(() => {
+    const handleEscape = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [onClose]);
+
+  useEffect(() => {
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, []);
+
+  const searchEmbed = async () => {
+    setSearching(true);
+    setError(null);
+    
+    try {
+        const response = await fetch('http://127.0.0.1:5000/api/get-embed', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            title: movie.title || movie.name,
+            tmdbId: movie.id
+          }),
+        });
+
+        const data = await response.json();
+
+        if (response.ok && data.embedUrl) {
+           setFoundLink(data.embedUrl);
+           setEmbedUrl(data.embedUrl);
+           setLoading(false);
+        } else {
+           throw new Error(data.error || 'Link não encontrado');
+        }
+
+    } catch (err) {
+        console.error("Erro ao buscar embed:", err);
+        setError('Não foi possível encontrar um link disponível no momento.');
+        setLoading(false);
+    } finally {
+        setSearching(false);
+    }
+  };
+
+  const openInNewTab = () => {
+    if (foundLink) {
+      window.open(foundLink, '_blank');
+    }
+  };
+
+  return (
+    <AnimatePresence>
+      <motion.div 
+        className="watch-modal-overlay"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        onClick={onClose}
+      >
+        <motion.div 
+          className="watch-modal"
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.95 }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button className="watch-modal-close" onClick={onClose}>
+            <X size={24} />
+          </button>
+
+          <div className="watch-modal-header">
+            <h2>{movie.title || movie.name}</h2>
+            <span className="watch-modal-year">
+              {(movie.release_date || movie.first_air_date)?.substring(0, 4)}
+            </span>
+          </div>
+
+          <div className="watch-modal-content">
+            {loading ? (
+              <div className="watch-loading">
+                <Loader2 className="spin" size={48} />
+                <p>Preparando Player...</p>
+                <span>Buscando melhor opção para você</span>
+              </div>
+            ) : error ? (
+              <div className="watch-error">
+                <p>{error}</p>
+                <motion.button 
+                  className="watch-retry-btn"
+                  onClick={searchEmbed}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                >
+                  Tentar Novamente
+                </motion.button>
+              </div>
+            ) : embedUrl ? (
+              <div className="watch-player-container">
+                <div className="watch-player-placeholder">
+                  <div className="player-placeholder-content">
+                    <Play size={64} />
+                    <h3>Player Carregado</h3>
+                    <p>O player foi preparado. Clique abaixo para assistir.</p>
+                    <motion.button 
+                      className="watch-open-btn"
+                      onClick={openInNewTab}
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                    >
+                      <ExternalLink size={20} />
+                      Abrir Player
+                    </motion.button>
+                  </div>
+                </div>
+                <div className="watch-info">
+                  <p>Link encontrado! O player será aberto em uma nova aba.</p>
+                </div>
+              </div>
+            ) : (
+              <div className="watch-searching">
+                <motion.button 
+                  className="watch-search-btn"
+                  onClick={searchEmbed}
+                  disabled={searching}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                >
+                  {searching ? (
+                    <>
+                      <Loader2 className="spin" size={24} />
+                      Buscando...
+                    </>
+                  ) : (
+                    <>
+                      <Search size={24} />
+                      Buscar Link
+                    </>
+                  )}
+                </motion.button>
+                <p className="watch-search-info">
+                  Clique para buscar links de streaming disponíveis
+                </p>
+              </div>
+            )}
+          </div>
+
+          <div className="watch-modal-footer">
+            <button className="watch-footer-link" onClick={openInNewTab} disabled={!foundLink}>
+              Abrir em nova aba
+            </button>
+            <span className="watch-footer-note">
+              Os links são buscados em tempo real
+            </span>
+          </div>
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
+  );
 };
 
 const MovieCard = ({ movie, index, onClick }) => {
@@ -679,6 +858,7 @@ const Navbar = () => {
 const HomePage = () => {
   const [selectedBrand, setSelectedBrand] = useState('all');
   const [selectedMovie, setSelectedMovie] = useState(null);
+  const [selectedWatchMovie, setSelectedWatchMovie] = useState(null);
   const [allMovies, setAllMovies] = useState([]);
   const [allTVShows, setAllTVShows] = useState([]);
   const [featured, setFeatured] = useState(null);
@@ -819,13 +999,20 @@ const HomePage = () => {
         </div>
       </footer>
 
-      {selectedMovie && (
+{selectedMovie && (
         <MovieModal 
           movie={selectedMovie} 
           onClose={() => {
             setSelectedMovie(null);
-            refreshMyList(); // Refresh list when modal closes
+            refreshMyList();
           }} 
+        />
+      )}
+
+      {selectedWatchMovie && (
+        <WatchModal
+          movie={selectedWatchMovie}
+          onClose={() => setSelectedWatchMovie(null)}
         />
       )}
     </div>
