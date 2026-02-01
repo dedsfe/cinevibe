@@ -81,3 +81,21 @@ def get_cached_ids(tmdb_ids: list) -> list:
         c.execute(query, formatted_ids)
         rows = c.fetchall()
         return [row[0] for row in rows]
+
+
+def get_cached_statuses(tmdb_ids: list) -> dict:
+    """
+    Returns a dictionary of {tmdb_id: embed_url} for the given IDs.
+    """
+    if not tmdb_ids:
+        return {}
+        
+    formatted_ids = [str(tid) for tid in tmdb_ids]
+    placeholders = ",".join("?" for _ in formatted_ids)
+    
+    with get_conn() as conn:
+        c = conn.cursor()
+        query = f"SELECT tmdb_id, embed_url FROM links WHERE tmdb_id IN ({placeholders})"
+        c.execute(query, formatted_ids)
+        rows = c.fetchall()
+        return {str(row["tmdb_id"]): row["embed_url"] for row in rows}

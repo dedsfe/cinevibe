@@ -594,6 +594,12 @@ const MovieCard = ({ movie, index, onClick, isAvailable }) => {
           </div>
         )}
         
+        {movie.isNotFound && (
+          <div className="status-badge not-found" title="Não encontrado no catálogo">
+            ❌
+          </div>
+        )}
+        
         <AnimatePresence>
           {isHovered && (
             <motion.div 
@@ -679,11 +685,13 @@ const LazyMovieRow = ({ title, fetchEndpoint, onMovieClick }) => {
                 });
                 if (checkRes.ok) {
                     const checkData = await checkRes.json();
-                    const availableSet = new Set(checkData.availableIds.map(String));
+                    const statuses = checkData.statuses || {};
                     
-                    // Add isAvailable flag
+                    // Add status flags
                     validMovies.forEach(m => {
-                        m.isAvailable = availableSet.has(String(m.id));
+                        const status = statuses[String(m.id)];
+                        m.isAvailable = status && status !== "NOT_FOUND";
+                        m.isNotFound = status === "NOT_FOUND";
                     });
                 }
             } catch (err) {

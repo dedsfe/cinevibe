@@ -3,212 +3,230 @@ import urllib.parse
 import time
 from playwright.sync_api import sync_playwright
 
-def scrape_operatopzera(title: str, year: str = None) -> str | None:
-    """
-    Scrapes the video embed URL from operatopzera.net using Playwright.
-    Follows strict navigation: Home -> Movies -> Search -> Type Query.
-    Uses 'Title Year' for more precise search if year is provided.
-    """
-    try:
-        with sync_playwright() as p:
-            # Launch browser
-            # headless=True for production
-            browser = p.chromium.launch(headless=True)
-            context = browser.new_context(
+# Configure logging to show in terminal
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+class OperaScraper:
+    def __init__(self):
+        self.playwright = None
+        self.browser = None
+        self.context = None
+        self.page = None
+        self.is_running = False
+
+    def start_session(self, headless=True):
+        """
+        Launches browser, logs in, and navigates to the search page.
+        Must be called once before scraping.
+        """
+        try:
+            logging.info("Starting Playwright session...")
+            self.playwright = sync_playwright().start()
+            self.browser = self.playwright.chromium.launch(headless=headless)
+            self.context = self.browser.new_context(
                 user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
             )
-            page = context.new_page()
-            
-            # 1. Go to Home Page
+            self.page = self.context.new_page()
+            self.is_running = True
+
+            # 1. Go to Home Page & Login
             base_url = "http://web.operatopzera.net/#/"
             logging.info(f"Navigating to home: {base_url}")
-            page.goto(base_url)
-            time.sleep(5) # Wait for check, sometimes it redirects to login
+            self.page.goto(base_url, timeout=60000)
+            self.page.wait_for_load_state("networkidle", timeout=60000)
 
-            # Check if we are on login page or need to login
-            if page.locator("input[name='username']").is_visible():
-                logging.info("Login page detected. Logging in...")
-                try:
-                    # Credentials
+            # Check for login
+            try:
+                login_selector = "input[name='username']"
+                if self.page.locator(login_selector).is_visible(timeout=5000):
+                    logging.info("Login page detected. Logging in...")
                     USER = "t2TGgarYJ"
                     PASS = "66e74xKRJ"
                     
-                    page.fill("input[name='username']", USER)
-                    page.fill("input[name='password']", PASS)
-                    page.click("button:has-text('Login')")
+                    self.page.fill("input[name='username']", USER)
+                    self.page.fill("input[name='password']", PASS)
+                    self.page.click("button:has-text('Login')")
                     
-                    logging.info("Login submitted. Waiting for navigation...")
-                    page.wait_for_url("**/#/", timeout=15000) # Should go back to home or dashboard
-                    time.sleep(3)
-                except Exception as e:
-                    logging.error(f"Login failed: {e}")
-                    # Save page source for debugging login failure
-                    with open("login_fail_dump.html", "w", encoding="utf-8") as f:
-                        f.write(page.content())
-                    browser.close()
-                    return None
+                    logging.info("Login submitted. Waiting for home/dashboard...")
+                    self.page.wait_for_url("**/#/", timeout=30000)
+                    time.sleep(2) 
+                else:
+                    logging.info("Already logged in or no login form found.")
+            except Exception as e:
+                logging.warning(f"Login check encountered error: {e}")
 
-            
             # 2. Go to Movies Page
             movies_url = "http://web.operatopzera.net/#/movie/"
             logging.info(f"Navigating to movies: {movies_url}")
-            page.goto(movies_url)
-            time.sleep(3)
-            
-            # 3. Go to Search Page and Type Query
+            self.page.goto(movies_url, timeout=30000)
+            time.sleep(2)
+
+            # 3. Go to Search Page (Stay here!)
             search_page_url = "http://web.operatopzera.net/#/movie/search/"
             logging.info(f"Navigating to search page: {search_page_url}")
-            page.goto(search_page_url)
+            self.page.goto(search_page_url, timeout=30000)
             
-            try:
-                # Wait for search input
-                INPUT_SELECTOR = "input[placeholder='Search stream...']"
-                SUBMIT_SELECTOR = "button[type='submit']"
-                
-                logging.info(f"Waiting for search input: {INPUT_SELECTOR}")
-                page.wait_for_selector(INPUT_SELECTOR, timeout=5000)
-                
-                # Type query and Click Submit (Enter key is unreliable)
-                # Use ONLY title for search (site search might be exact match and fail with year)
-                search_query = title
-                logging.info(f"Typing query: '{search_query}'")
-                
-                page.fill(INPUT_SELECTOR, search_query)
-                time.sleep(1) # Small delay to ensure input is registered
-                
-                logging.info(f"Clicking submit button: {SUBMIT_SELECTOR}")
-                page.click(SUBMIT_SELECTOR)
-                
-            except Exception as e:
-                logging.error(f"Failed to interact with search bar: {e}")
-                browser.close()
-                return None
-            try:
-                # Wait for results to appear
-                # Logic: The first 'a' tag inside the results grid often points to the movie
-                # We expect a link containing '/movie/category' or similar structure for details/play
-                result_selector = 'a[href*="/movie/"]'
-                logging.info("Waiting for search results...")
-                # Give it time to render results after Enter
-                page.wait_for_selector(result_selector, state="visible", timeout=8000)
-                
-                # Get the first result (Index 0 often might be a nav item, so be careful. 
-                # But usually the grid results appear after nav)
-                # Let's target links specifically inside a grid/list container if possible, 
-                # but 'a[href*="/movie/category"]' or similar is a good bet for a result.
-                
-                # We can refine this using the user's hint if needed, but 'a[href*="/movie/"]' is standard for their SPA routing
-                results = page.locator(result_selector).all()
-                target_link = None
-                
-                # Filter out 'search' or 'category' generics if possible, trying to find a specific movie link
-                # Typical pattern: #/movie/category/118/217376/play/ or #/movie/category/118/217376
-                # Filter out 'search' or 'category' generics if possible, trying to find a specific movie link
-                # Typical pattern: #/movie/category/118/217376/play/ or #/movie/category/118/217376
-                for res in results:
-                    href = res.get_attribute("href")
-                    text_content = res.inner_text().strip().lower()
-                    
-                    # Capture Image Alt Text (Crucial for Year)
-                    img_alt = ""
-                    try:
-                        img = res.locator("img").first
-                        # Even if hidden (width=0), the alt text is valuable for validation
-                        img_alt = img.get_attribute("alt") or ""
-                    except:
-                        pass
-                    
-                    full_validation_text = f"{text_content} {img_alt.lower()}"
+            # Verify we are ready to search
+            INPUT_SELECTOR = "input[placeholder='Search stream...']"
+            self.page.wait_for_selector(INPUT_SELECTOR, state="visible", timeout=15000)
+            logging.info("Session started successfully. Ready to scrape.")
 
-                    if href and "search" not in href and len(href.split("/")) > 4:
-                        # Strict Validation
-                        title_clean = title.lower()
-                        if title_clean in full_validation_text:
-                            # Verify Year if provided (Critical for precision)
-                            if year and year not in full_validation_text:
-                                logging.info(f"Skipping result: '{full_validation_text}' matches title but not year '{year}'")
-                                continue
+        except Exception as e:
+            logging.error(f"Failed to start session: {e}")
+            self.stop_session()
+            raise e
 
-                            logging.info(f"Match found: '{full_validation_text}' matches '{title}'" + (f" and '{year}'" if year else ""))
-                            target_link = res
-                            break
-                        else:
-                             logging.info(f"Skipping result: '{full_validation_text}' does not contain '{title}'")
+    def stop_session(self):
+        """Closes the browser and cleanup."""
+        logging.info("Stopping Playwright session...")
+        if self.page: self.page.close()
+        if self.context: self.context.close()
+        if self.browser: self.browser.close()
+        if self.playwright: self.playwright.stop()
+        self.is_running = False
 
-                if not target_link:
-                     logging.warning(f"No results matched the title '{title}' strictly.")
-                     browser.close()
-                     return None
-
-                logging.info(f"Clicking result with href: {target_link.get_attribute('href')}")
-                target_link.click()
-                
-            except Exception as e:
-                logging.error(f"Failed to find or click search result: {e}")
-                # Save page source for debugging
-                with open("page_dump.html", "w", encoding="utf-8") as f:
-                    f.write(page.content())
-                browser.close()
-                return None
-
-            # 5. Handle 'Details' vs 'Play' page
-            time.sleep(3)
-            current_url = page.url
-            logging.info(f"Current URL: {current_url}")
-            
-            if "/play/" not in current_url:
-                logging.info("Not on play page, looking for Play/Assistir button...")
-                try:
-                    # 5.1 VERIFY PAGE CONTENT (especially Year)
-                    # If we blindly clicked a candidate, ensure it's the right one
-                    if year:
-                        page_text = page.inner_text("body").lower()
-                        if year not in page_text:
-                             logging.warning(f"Year '{year}' not found on details page. Wrong movie selected?")
-                             # We could return None here, or rely on user check. 
-                             # But sticking to strict validation:
-                             browser.close()
-                             return None
-                             
-                    # Try clicking a button that contains "Assistir" or "Play"
-                    # Or a link with '/play/'
-                    play_link_selector = 'a[href*="/play/"]'
-                    if page.is_visible(play_link_selector):
-                         page.locator(play_link_selector).first.click()
-                    else:
-                         # Try generic text match (case insensitive typically handled by get_by_text roughly)
-                         page.get_by_text("Assistir").first.click()
-                except Exception as e:
-                    logging.warning(f"Could not find explicit play button: {e}")
-                    # Sometimes you are already on the correct page or just need to click the poster
-                    pass
-            
-            # 6. Extract Video Src
-            try:
-                logging.info("Waiting for video player...")
-                page.wait_for_selector('video', timeout=10000)
-                
-                # Attempt to play
-                page.evaluate("document.querySelector('video').play().catch(e => {})")
-                
-                # Poll for src
-                logging.info("Polling for video.src...")
-                for i in range(15):
-                    src = page.evaluate("document.querySelector('video').src")
-                    if src and src.startswith("http") and "blob" not in src:
-                        logging.info(f"Found source: {src}")
-                        browser.close()
-                        return src
-                    time.sleep(1)
-                    
-                logging.error("Timeout waiting for video src")
-                    
-            except Exception as e:
-                logging.error(f"Error extracting video source: {e}")
-
-            browser.close()
+    def scrape_title(self, title: str, year: str = None) -> str | None:
+        """
+        Scrapes a single title using the existing session.
+        Assumes we are already on the Search Page or can easily get back to it.
+        """
+        if not self.is_running or not self.page:
+            logging.error("Scraper session is not running. Call start_session() first.")
             return None
 
-    except Exception as e:
-        logging.error(f"Playwright error: {e}")
-        return None
+        try:
+            # Ensure we are on search page
+            if "/movie/search" not in self.page.url:
+                logging.info("Not on search page, navigating back...")
+                self.page.goto("http://web.operatopzera.net/#/movie/search/", timeout=15000)
+            
+            INPUT_SELECTOR = "input[placeholder='Search stream...']"
+            SUBMIT_SELECTOR = "button[type='submit']"
+            
+            # Clear input and type
+            self.page.wait_for_selector(INPUT_SELECTOR, state="visible", timeout=5000)
+            self.page.fill(INPUT_SELECTOR, "")
+            self.page.fill(INPUT_SELECTOR, title)
+            time.sleep(0.5)
+            
+            logging.info(f"Searching for: {title}")
+            self.page.keyboard.press("Enter")
+            
+            # Check if submit click is needed (wait briefly)
+            try:
+                if self.page.locator(SUBMIT_SELECTOR).is_visible(timeout=1000):
+                     self.page.click(SUBMIT_SELECTOR, timeout=2000)
+            except: pass
+
+            # Wait for results
+            try:
+                # Wait for A MOVIE LINK with the title text
+                self.page.locator(f"a[href*='/movie/']").filter(has_text=title).first.wait_for(state="visible", timeout=10000)
+            except:
+                logging.warning(f"Title '{title}' not found in results.")
+                return None
+
+            # Find target
+            target_link = None
+            target_locator = self.page.locator(f"a[href*='/movie/']").filter(has_text=title).first
+            
+            if target_locator.is_visible():
+                target_link = target_locator
+                # Year check
+                if year:
+                    txt = target_link.inner_text().lower()
+                    try:
+                        alt = target_link.locator("img").get_attribute("alt") or ""
+                        txt += " " + alt.lower()
+                    except: pass
+                    if year not in txt:
+                        logging.warning(f"Year mismatch for {title}. Found in {txt}")
+                        target_link = None
+            
+            # Fallback loop (same as before but using self.page)
+            if not target_link:
+                # ... (Simplified logic: if direct match failed despite wait, sticking to direct match for speed for now. 
+                # If the wait passed, target_locator.is_visible should be true. 
+                # If wait failed, we returned None earlier.)
+                pass
+
+            if not target_link:
+                logging.warning("No valid link found after search.")
+                return None
+
+            # Determine if we need to open in new tab or same tab?
+            # User workflow says: Select -> Play -> Extract
+            # If we click, we navigate AWAY from search. 
+            # To handle iteration efficiently, we should probably do this in the same tab 
+            # and then GO BACK to search for the next movie.
+            
+            logging.info("Clicking movie link...")
+            target_link.scroll_into_view_if_needed()
+            target_link.click()
+            
+            # On Movie Page
+            time.sleep(2)
+            
+            # Play button logic
+            if "/play/" not in self.page.url:
+                try:
+                    play_btn = self.page.locator("a[href*='/play/'], button:has-text('Play'), button:has-text('Assistir')").first
+                    if play_btn.is_visible(timeout=5000):
+                        play_btn.click()
+                    else:
+                        logging.warning("Play button not found.")
+                except: pass
+
+            # Extract Video
+            video_src = None
+            try:
+                self.page.wait_for_selector("video", timeout=20000)
+                # Force play
+                self.page.evaluate("document.querySelector('video').play().catch(() => {})")
+                
+                for _ in range(10):
+                    src = self.page.evaluate("document.querySelector('video').src")
+                    if src and src.startswith("http") and "blob" not in src:
+                        video_src = src
+                        break
+                    time.sleep(1)
+            except Exception as e:
+                logging.error(f"Error extracting video: {e}")
+
+            # RESET FOR NEXT SEARCH: Go back to search page
+            logging.info("Returning to search page...")
+            self.page.goto("http://web.operatopzera.net/#/movie/search/")
+            
+            return video_src
+
+        except Exception as e:
+            logging.error(f"Error checking {title}: {e}")
+            # Try to recover session state
+            try: 
+                self.page.goto("http://web.operatopzera.net/#/movie/search/")
+            except: pass
+            return None
+
+# Global instance
+_scraper_instance = None
+
+def get_scraper():
+    global _scraper_instance
+    if _scraper_instance is None:
+        _scraper_instance = OperaScraper()
+    return _scraper_instance
+
+def scrape_operatopzera(title: str, year: str = None) -> str | None:
+    """Wrapper to maintain compatibility or simple usage"""
+    s = get_scraper()
+    if not s.is_running:
+        s.start_session()
+    return s.scrape_title(title, year)
+
+if __name__ == "__main__":
+    s = OperaScraper()
+    s.start_session(headless=True)
+    print("Scraping 'A Empregada'...")
+    link = s.scrape_title("A Empregada") 
+    print(f"Result: {link}")
+    s.stop_session()

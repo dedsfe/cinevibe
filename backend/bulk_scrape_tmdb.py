@@ -19,7 +19,7 @@ CATEGORIES = [
 ]
 
 def fetch_movies(endpoint):
-    url = f"{BASE_URL}{endpoint}?api_key={API_KEY}&language=en-US&page=1"
+    url = f"{BASE_URL}{endpoint}?api_key={API_KEY}&language=pt-BR&page=1"
     try:
         res = requests.get(url)
         if res.status_code == 200:
@@ -65,6 +65,15 @@ def run_bulk_scrape():
     try:
         init_db()
         
+        # Start persistent session
+        from playwright_scraper import get_scraper
+        scraper_instance = get_scraper()
+        try:
+            scraper_instance.start_session(headless=True)
+        except Exception as e:
+            log_state(f"Failed to start scraper session: {e}", "ERROR")
+            return
+
         all_movies = []
         
         # 1. Collect all movies from categories
@@ -83,6 +92,11 @@ def run_bulk_scrape():
         # 2. Scrape each
         count = 0
         for movie in unique_movies:
+            # Check if session is still alive
+            if not scraper_instance.is_running:
+                 log_state("Scraper session died, restarting...", "WARNING")
+                 scraper_instance.start_session(headless=True)
+
             SCRAPER_STATE["progress"]["current"] = count + 1
             
             title = movie.get("title") or movie.get("name")
@@ -109,16 +123,25 @@ def run_bulk_scrape():
                     save_embed(title, embed, tmdb_id)
                     log_state(" -> Saved!")
                 else:
-                    log_state(" -> No embed found.", "WARNING")
+                    # Save as NOT_FOUND so we know we checked it
+                    save_embed(title, "NOT_FOUND", tmdb_id)
+                    log_state(" -> No embed found (marked as NOT_FOUND).", "WARNING")
             except Exception as e:
                 log_state(f" -> Failed: {e}", "ERROR")
+                # Optionally also mark as checked/error? For now just log.
                 
             count += 1
-            time.sleep(2) # Be nice to the server
+            time.sleep(1) # Reduced sleep since we don't need to be as nice to our own session, but still good practice
             
     except Exception as e:
          log_state(f"Fatal Scraper Error: {e}", "ERROR")
     finally:
+        # Close session
+        try:
+            if 'scraper_instance' in locals():
+                scraper_instance.stop_session()
+        except: pass
+        
         SCRAPER_STATE["is_running"] = False
         SCRAPER_STATE["current_movie"] = "Done"
 

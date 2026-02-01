@@ -473,6 +473,14 @@
   box-shadow: 0 0 10px rgba(46, 204, 113, 0.4);
 }
 
+.status-badge.not-found {
+  background: rgba(231, 76, 60, 0.9);
+  color: white;
+  border: none;
+  font-weight: bold;
+  box-shadow: 0 0 10px rgba(231, 76, 60, 0.4);
+}
+
 .movie-card:hover .movie-poster {
   transform: scale(1.05);
 }

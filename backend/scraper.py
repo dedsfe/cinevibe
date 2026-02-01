@@ -90,6 +90,7 @@ def scrape_for_title(title: str, tmdb_id: str = None, year: str = None) -> str |
     try:
         from playwright_scraper import scrape_operatopzera
         logging.info(f"Attempting Opera Topzera scrape for: {title} (Year: {year})")
+        # The wrapper handles session start if needed, but for bulk we want explicit control
         embed = scrape_operatopzera(title, year=year)
         if embed:
              # Basic validation since it comes from a trusted scrape logic

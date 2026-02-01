@@ -5,7 +5,7 @@ import threading
 from datetime import datetime
 
 # Local modules (to be created below in this patch)
-from database import init_db, get_cached_embed, get_cached_embed_by_id, save_embed, get_cache_count, get_cached_ids
+from database import init_db, get_cached_embed, get_cached_embed_by_id, save_embed, get_cache_count, get_cached_ids, get_cached_statuses
 from scraper import scrape_for_title
 from validator import validate_embed
 from bulk_scrape_tmdb import run_bulk_scrape, get_scraper_state
@@ -39,10 +39,10 @@ def check_cache_batch():
     tmdb_ids = data.get("tmdbIds", [])
     
     if not tmdb_ids:
-        return jsonify({"availableIds": []})
+        return jsonify({"statuses": {}})
         
-    found_ids = get_cached_ids(tmdb_ids)
-    return jsonify({"availableIds": found_ids})
+    statuses = get_cached_statuses(tmdb_ids)
+    return jsonify({"statuses": statuses})
 
 
 @app.route("/api/scraper/status", methods=["GET"])
