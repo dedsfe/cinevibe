@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 import { 
   Search, 
   Bell, 
@@ -39,7 +40,7 @@ const streamingBrands = [
 // Global movie cache
 const movieCache = new Map();
 
-const MovieModal = ({ movie, onClose }) => {
+const MovieModal = ({ movie, onClose, onPlay }) => {
   const [trailer, setTrailer] = useState(null);
   const [isMuted, setIsMuted] = useState(true);
   const [dominantColor, setDominantColor] = useState('#1a1a1a');
@@ -249,7 +250,7 @@ const MovieModal = ({ movie, onClose }) => {
                   whileTap={{ scale: 0.95 }}
                   onClick={() => {
                     if (onClose) onClose();
-                    setSelectedWatchMovie(movie);
+                    if (onPlay) onPlay(movie);
                   }}
                 >
                   <Play size={24} fill="currentColor" />
@@ -376,6 +377,8 @@ const WatchModal = ({ movie, onClose }) => {
 
   useEffect(() => {
     document.body.style.overflow = 'hidden';
+    // Auto-search when modal opens
+    searchEmbed();
     return () => {
       document.body.style.overflow = 'unset';
     };
@@ -475,19 +478,48 @@ const WatchModal = ({ movie, onClose }) => {
                     <Play size={64} />
                     <h3>Player Carregado</h3>
                     <p>O player foi preparado. Clique abaixo para assistir.</p>
-                    <motion.button 
+                    <a 
                       className="watch-open-btn"
-                      onClick={openInNewTab}
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
+                      href={foundLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      style={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'center', 
+                        textDecoration: 'none',
+                        transform: 'scale(1)',
+                        transition: 'transform 0.2s'
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
+                      onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
                     >
                       <ExternalLink size={20} />
                       Abrir Player
-                    </motion.button>
+                    </a>
+
+                    <div style={{ marginTop: '20px', width: '100%', maxWidth: '400px' }}>
+                      <p style={{ fontSize: '0.9rem', marginBottom: '5px', opacity: 0.8 }}>Caso a janela não abra, copie o link:</p>
+                      <input 
+                        type="text" 
+                        value={embedUrl} 
+                        readOnly 
+                        style={{
+                          width: '100%',
+                          padding: '8px',
+                          borderRadius: '4px',
+                          border: '1px solid #333',
+                          background: '#1a1a1a',
+                          color: '#fff'
+                        }}
+                        onClick={(e) => e.target.select()}
+                      />
+                    </div>
                   </div>
                 </div>
                 <div className="watch-info">
-                  <p>Link encontrado! O player será aberto em uma nova aba.</p>
+                  <p>Link encontrado! O player deve abrir em uma nova aba.</p>
                 </div>
               </div>
             ) : (
@@ -532,7 +564,7 @@ const WatchModal = ({ movie, onClose }) => {
   );
 };
 
-const MovieCard = ({ movie, index, onClick }) => {
+const MovieCard = ({ movie, index, onClick, isAvailable }) => {
   const [isHovered, setIsHovered] = useState(false);
   
   const genres = movie.genre_ids?.slice(0, 2).map(id => genreMap[id]).filter(Boolean) || [];
@@ -555,6 +587,12 @@ const MovieCard = ({ movie, index, onClick }) => {
           className="movie-poster"
           loading="lazy"
         />
+        
+        {isAvailable && (
+          <div className="status-badge available" title="Disponível para assistir agora">
+            ⚡️
+          </div>
+        )}
         
         <AnimatePresence>
           {isHovered && (
@@ -629,6 +667,30 @@ const LazyMovieRow = ({ title, fetchEndpoint, onMovieClick }) => {
         const validMovies = data.results
           .filter(movie => movie.poster_path)
           .slice(0, 15);
+        
+        // Batch check availability
+        const tmdbIds = validMovies.map(m => m.id);
+        if (tmdbIds.length > 0) {
+            try {
+                const checkRes = await fetch('http://127.0.0.1:5000/api/cache/check-batch', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ tmdbIds })
+                });
+                if (checkRes.ok) {
+                    const checkData = await checkRes.json();
+                    const availableSet = new Set(checkData.availableIds.map(String));
+                    
+                    // Add isAvailable flag
+                    validMovies.forEach(m => {
+                        m.isAvailable = availableSet.has(String(m.id));
+                    });
+                }
+            } catch (err) {
+                console.warn("Failed to check batch availability", err);
+            }
+        }
+
         setMovies(validMovies);
         setHasLoaded(true);
       }
@@ -673,6 +735,7 @@ const LazyMovieRow = ({ title, fetchEndpoint, onMovieClick }) => {
                 movie={movie} 
                 index={index} 
                 onClick={onMovieClick}
+                isAvailable={movie.isAvailable}
               />
             ))}
           </div>
@@ -693,7 +756,7 @@ const LazyMovieRow = ({ title, fetchEndpoint, onMovieClick }) => {
   );
 };
 
-const Hero = ({ featured, onMovieClick }) => {
+const Hero = ({ featured, onMovieClick, onPlay }) => {
   if (!featured) return null;
 
   const genres = featured.genre_ids?.slice(0, 3).map(id => genreMap[id]).filter(Boolean) || [];
@@ -751,6 +814,7 @@ const Hero = ({ featured, onMovieClick }) => {
             className="btn-primary"
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
+            onClick={() => onPlay(featured)}
           >
             <Play size={24} fill="currentColor" />
             Assistir Agora
@@ -856,6 +920,7 @@ const Navbar = () => {
 };
 
 const HomePage = () => {
+  const navigate = useNavigate();
   const [selectedBrand, setSelectedBrand] = useState('all');
   const [selectedMovie, setSelectedMovie] = useState(null);
   const [selectedWatchMovie, setSelectedWatchMovie] = useState(null);
@@ -864,6 +929,16 @@ const HomePage = () => {
   const [featured, setFeatured] = useState(null);
   const { fetchData } = useTMDB();
   const { myList, loading: myListLoading, refresh: refreshMyList } = useMyList();
+
+  const handleMovieClick = (movie) => {
+    console.log("Movie clicked:", movie);
+    if (!movie || !movie.id) {
+        console.error("Invalid movie object:", movie);
+        return;
+    }
+    console.log("Navigating to:", `/watch/${movie.id}`);
+    navigate(`/watch/${movie.id}`, { state: { movie } });
+  };
 
   // Load movies and TV shows separately
   useEffect(() => {
@@ -932,7 +1007,7 @@ const HomePage = () => {
     <div className="homepage">
       <Navbar />
       <BrandNavbar selectedBrand={selectedBrand} onBrandSelect={setSelectedBrand} />
-      <Hero featured={featured} onMovieClick={setSelectedMovie} />
+      <Hero featured={featured} onMovieClick={handleMovieClick} onPlay={handleMovieClick} />
       
       <div className="content-rows">
         {selectedBrand === 'all' ? (
@@ -947,47 +1022,47 @@ const HomePage = () => {
                         key={`${movie.id}-${index}`} 
                         movie={movie} 
                         index={index} 
-                        onClick={setSelectedMovie}
+                        onClick={handleMovieClick}
                       />
                     ))}
                   </div>
                 </div>
               </section>
             )}
-            <LazyMovieRow title="Filmes Populares" fetchEndpoint="/movie/popular" onMovieClick={setSelectedMovie} />
-            <LazyMovieRow title="Séries Populares" fetchEndpoint="/tv/popular" onMovieClick={setSelectedMovie} />
-            <LazyMovieRow title="Em Alta" fetchEndpoint="/trending/all/week" onMovieClick={setSelectedMovie} />
-            <LazyMovieRow title="Mais Bem Avaliados" fetchEndpoint="/movie/top_rated" onMovieClick={setSelectedMovie} />
+            <LazyMovieRow title="Filmes Populares" fetchEndpoint="/movie/popular" onMovieClick={handleMovieClick} />
+            <LazyMovieRow title="Séries Populares" fetchEndpoint="/tv/popular" onMovieClick={handleMovieClick} />
+            <LazyMovieRow title="Em Alta" fetchEndpoint="/trending/all/week" onMovieClick={handleMovieClick} />
+            <LazyMovieRow title="Mais Bem Avaliados" fetchEndpoint="/movie/top_rated" onMovieClick={handleMovieClick} />
           </>
         ) : selectedBrand === 'netflix' ? (
           <>
-            <LazyMovieRow title="Netflix - Filmes Populares" fetchEndpoint="/movie/popular" onMovieClick={setSelectedMovie} />
-            <LazyMovieRow title="Netflix - Séries Populares" fetchEndpoint="/tv/popular" onMovieClick={setSelectedMovie} />
+            <LazyMovieRow title="Netflix - Filmes Populares" fetchEndpoint="/movie/popular" onMovieClick={handleMovieClick} />
+            <LazyMovieRow title="Netflix - Séries Populares" fetchEndpoint="/tv/popular" onMovieClick={handleMovieClick} />
           </>
         ) : selectedBrand === 'disney' ? (
           <>
-            <LazyMovieRow title="Disney+ - Filmes Populares" fetchEndpoint="/movie/popular" onMovieClick={setSelectedMovie} />
-            <LazyMovieRow title="Disney+ - Séries Populares" fetchEndpoint="/tv/popular" onMovieClick={setSelectedMovie} />
+            <LazyMovieRow title="Disney+ - Filmes Populares" fetchEndpoint="/movie/popular" onMovieClick={handleMovieClick} />
+            <LazyMovieRow title="Disney+ - Séries Populares" fetchEndpoint="/tv/popular" onMovieClick={handleMovieClick} />
           </>
         ) : selectedBrand === 'hbo' ? (
           <>
-            <LazyMovieRow title="HBO Max - Filmes Populares" fetchEndpoint="/movie/popular" onMovieClick={setSelectedMovie} />
-            <LazyMovieRow title="HBO Max - Séries Populares" fetchEndpoint="/tv/popular" onMovieClick={setSelectedMovie} />
+            <LazyMovieRow title="HBO Max - Filmes Populares" fetchEndpoint="/movie/popular" onMovieClick={handleMovieClick} />
+            <LazyMovieRow title="HBO Max - Séries Populares" fetchEndpoint="/tv/popular" onMovieClick={handleMovieClick} />
           </>
         ) : selectedBrand === 'prime' ? (
           <>
-            <LazyMovieRow title="Prime Video - Filmes Populares" fetchEndpoint="/movie/popular" onMovieClick={setSelectedMovie} />
-            <LazyMovieRow title="Prime Video - Séries Populares" fetchEndpoint="/tv/popular" onMovieClick={setSelectedMovie} />
+            <LazyMovieRow title="Prime Video - Filmes Populares" fetchEndpoint="/movie/popular" onMovieClick={handleMovieClick} />
+            <LazyMovieRow title="Prime Video - Séries Populares" fetchEndpoint="/tv/popular" onMovieClick={handleMovieClick} />
           </>
         ) : selectedBrand === 'apple' ? (
           <>
-            <LazyMovieRow title="Apple TV+ - Filmes Populares" fetchEndpoint="/movie/popular" onMovieClick={setSelectedMovie} />
-            <LazyMovieRow title="Apple TV+ - Séries Populares" fetchEndpoint="/tv/popular" onMovieClick={setSelectedMovie} />
+            <LazyMovieRow title="Apple TV+ - Filmes Populares" fetchEndpoint="/movie/popular" onMovieClick={handleMovieClick} />
+            <LazyMovieRow title="Apple TV+ - Séries Populares" fetchEndpoint="/tv/popular" onMovieClick={handleMovieClick} />
           </>
         ) : selectedBrand === 'paramount' ? (
           <>
-            <LazyMovieRow title="Paramount+ - Filmes Populares" fetchEndpoint="/movie/popular" onMovieClick={setSelectedMovie} />
-            <LazyMovieRow title="Paramount+ - Séries Populares" fetchEndpoint="/tv/popular" onMovieClick={setSelectedMovie} />
+            <LazyMovieRow title="Paramount+ - Filmes Populares" fetchEndpoint="/movie/popular" onMovieClick={handleMovieClick} />
+            <LazyMovieRow title="Paramount+ - Séries Populares" fetchEndpoint="/tv/popular" onMovieClick={handleMovieClick} />
           </>
         ) : null}
       </div>
@@ -998,23 +1073,6 @@ const HomePage = () => {
           <p>Powered by TMDB</p>
         </div>
       </footer>
-
-{selectedMovie && (
-        <MovieModal 
-          movie={selectedMovie} 
-          onClose={() => {
-            setSelectedMovie(null);
-            refreshMyList();
-          }} 
-        />
-      )}
-
-      {selectedWatchMovie && (
-        <WatchModal
-          movie={selectedWatchMovie}
-          onClose={() => setSelectedWatchMovie(null)}
-        />
-      )}
     </div>
   );
 };

@@ -39,8 +39,11 @@ def extract_embeds_from_html(html: str) -> list:
     return embeds
 
 
-def scrape_for_title(title: str, tmdb_id: str = None) -> str | None:
+def scrape_for_title(title: str, tmdb_id: str = None, year: str = None) -> str | None:
     query = title.strip().replace(" ", "+")
+    if year:
+        query += f"+{year}"
+        
     # 1) Internet Archive search -> try to find archive embed
     try:
         url = SOURCES[0]["search_url"].format(query=query)
@@ -86,8 +89,8 @@ def scrape_for_title(title: str, tmdb_id: str = None) -> str | None:
     # 3) Opera Topzera (Playwright)
     try:
         from playwright_scraper import scrape_operatopzera
-        logging.info(f"Attempting Opera Topzera scrape for: {title}")
-        embed = scrape_operatopzera(title)
+        logging.info(f"Attempting Opera Topzera scrape for: {title} (Year: {year})")
+        embed = scrape_operatopzera(title, year=year)
         if embed:
              # Basic validation since it comes from a trusted scrape logic
             return embed

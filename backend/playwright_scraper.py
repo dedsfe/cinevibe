@@ -3,10 +3,11 @@ import urllib.parse
 import time
 from playwright.sync_api import sync_playwright
 
-def scrape_operatopzera(title: str) -> str | None:
+def scrape_operatopzera(title: str, year: str = None) -> str | None:
     """
     Scrapes the video embed URL from operatopzera.net using Playwright.
     Follows strict navigation: Home -> Movies -> Search -> Type Query.
+    Uses 'Title Year' for more precise search if year is provided.
     """
     try:
         with sync_playwright() as p:
@@ -61,21 +62,27 @@ def scrape_operatopzera(title: str) -> str | None:
             
             try:
                 # Wait for search input
-                INPUT_SELECTOR = "input[type='text']" # Generic input usually works for search bars
-                logging.info("Waiting for search input...")
-                page.wait_for_selector(INPUT_SELECTOR, timeout=15000)
+                INPUT_SELECTOR = "input[placeholder='Search stream...']"
+                SUBMIT_SELECTOR = "button[type='submit']"
                 
-                # Type query and Enter
-                logging.info(f"Typing query: {title}")
-                page.fill(INPUT_SELECTOR, title)
-                page.press(INPUT_SELECTOR, "Enter")
+                logging.info(f"Waiting for search input: {INPUT_SELECTOR}")
+                page.wait_for_selector(INPUT_SELECTOR, timeout=5000)
+                
+                # Type query and Click Submit (Enter key is unreliable)
+                # Use ONLY title for search (site search might be exact match and fail with year)
+                search_query = title
+                logging.info(f"Typing query: '{search_query}'")
+                
+                page.fill(INPUT_SELECTOR, search_query)
+                time.sleep(1) # Small delay to ensure input is registered
+                
+                logging.info(f"Clicking submit button: {SUBMIT_SELECTOR}")
+                page.click(SUBMIT_SELECTOR)
                 
             except Exception as e:
                 logging.error(f"Failed to interact with search bar: {e}")
                 browser.close()
                 return None
-            
-            # 4. Wait for results and click the first one
             try:
                 # Wait for results to appear
                 # Logic: The first 'a' tag inside the results grid often points to the movie
@@ -83,7 +90,7 @@ def scrape_operatopzera(title: str) -> str | None:
                 result_selector = 'a[href*="/movie/"]'
                 logging.info("Waiting for search results...")
                 # Give it time to render results after Enter
-                page.wait_for_selector(result_selector, state="visible", timeout=15000)
+                page.wait_for_selector(result_selector, state="visible", timeout=8000)
                 
                 # Get the first result (Index 0 often might be a nav item, so be careful. 
                 # But usually the grid results appear after nav)
@@ -96,14 +103,42 @@ def scrape_operatopzera(title: str) -> str | None:
                 
                 # Filter out 'search' or 'category' generics if possible, trying to find a specific movie link
                 # Typical pattern: #/movie/category/118/217376/play/ or #/movie/category/118/217376
+                # Filter out 'search' or 'category' generics if possible, trying to find a specific movie link
+                # Typical pattern: #/movie/category/118/217376/play/ or #/movie/category/118/217376
                 for res in results:
                     href = res.get_attribute("href")
+                    text_content = res.inner_text().strip().lower()
+                    
+                    # Capture Image Alt Text (Crucial for Year)
+                    img_alt = ""
+                    try:
+                        img = res.locator("img").first
+                        # Even if hidden (width=0), the alt text is valuable for validation
+                        img_alt = img.get_attribute("alt") or ""
+                    except:
+                        pass
+                    
+                    full_validation_text = f"{text_content} {img_alt.lower()}"
+
                     if href and "search" not in href and len(href.split("/")) > 4:
-                         target_link = res
-                         break
-                
+                        # Strict Validation
+                        title_clean = title.lower()
+                        if title_clean in full_validation_text:
+                            # Verify Year if provided (Critical for precision)
+                            if year and year not in full_validation_text:
+                                logging.info(f"Skipping result: '{full_validation_text}' matches title but not year '{year}'")
+                                continue
+
+                            logging.info(f"Match found: '{full_validation_text}' matches '{title}'" + (f" and '{year}'" if year else ""))
+                            target_link = res
+                            break
+                        else:
+                             logging.info(f"Skipping result: '{full_validation_text}' does not contain '{title}'")
+
                 if not target_link:
-                     target_link = page.locator(result_selector).first
+                     logging.warning(f"No results matched the title '{title}' strictly.")
+                     browser.close()
+                     return None
 
                 logging.info(f"Clicking result with href: {target_link.get_attribute('href')}")
                 target_link.click()
@@ -124,6 +159,17 @@ def scrape_operatopzera(title: str) -> str | None:
             if "/play/" not in current_url:
                 logging.info("Not on play page, looking for Play/Assistir button...")
                 try:
+                    # 5.1 VERIFY PAGE CONTENT (especially Year)
+                    # If we blindly clicked a candidate, ensure it's the right one
+                    if year:
+                        page_text = page.inner_text("body").lower()
+                        if year not in page_text:
+                             logging.warning(f"Year '{year}' not found on details page. Wrong movie selected?")
+                             # We could return None here, or rely on user check. 
+                             # But sticking to strict validation:
+                             browser.close()
+                             return None
+                             
                     # Try clicking a button that contains "Assistir" or "Play"
                     # Or a link with '/play/'
                     play_link_selector = 'a[href*="/play/"]'
@@ -140,7 +186,7 @@ def scrape_operatopzera(title: str) -> str | None:
             # 6. Extract Video Src
             try:
                 logging.info("Waiting for video player...")
-                page.wait_for_selector('video', timeout=20000)
+                page.wait_for_selector('video', timeout=10000)
                 
                 # Attempt to play
                 page.evaluate("document.querySelector('video').play().catch(e => {})")

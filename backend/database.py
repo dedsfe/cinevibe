@@ -35,6 +35,16 @@ def get_cached_embed(title: str):
         return row[0] if row else None
 
 
+def get_cached_embed_by_id(tmdb_id: str):
+    if not tmdb_id:
+        return None
+    with get_conn() as conn:
+        c = conn.cursor()
+        c.execute("SELECT embed_url FROM links WHERE tmdb_id = ?", (str(tmdb_id),))
+        row = c.fetchone()
+        return row[0] if row else None
+
+
 def save_embed(title: str, embed_url: str, tmdb_id: Optional[str] = None):
     with get_conn() as conn:
         c = conn.cursor()
@@ -53,3 +63,21 @@ def get_cache_count():
         total = row[0] if row else 0
         # For educational purposes, tmdb_items mirrors cached_links
         return {"cached_links": total, "tmdb_items": total}
+
+
+def get_cached_ids(tmdb_ids: list) -> list:
+    """
+    Returns a list of tmdb_ids that are present in the links table.
+    """
+    if not tmdb_ids:
+        return []
+        
+    formatted_ids = [str(tid) for tid in tmdb_ids]
+    placeholders = ",".join("?" for _ in formatted_ids)
+    
+    with get_conn() as conn:
+        c = conn.cursor()
+        query = f"SELECT tmdb_id FROM links WHERE tmdb_id IN ({placeholders})"
+        c.execute(query, formatted_ids)
+        rows = c.fetchall()
+        return [row[0] for row in rows]

@@ -1,6 +1,6 @@
 // IndexedDB Database for CineVibe
 const DB_NAME = 'CineVibeDB';
-const DB_VERSION = 1;
+const DB_VERSION = 4; // Incremented to force upgrade
 
 // Initialize IndexedDB
 export const initDB = () => {
@@ -29,6 +29,11 @@ export const initDB = () => {
       if (!db.objectStoreNames.contains('movieDetails')) {
         db.createObjectStore('movieDetails', { keyPath: 'id' });
       }
+
+      // Store for Persistent Video Links (Offline Playback)
+      if (!db.objectStoreNames.contains('videoLinks')) {
+        db.createObjectStore('videoLinks', { keyPath: 'id' });
+      }
     };
   });
 };
@@ -46,7 +51,19 @@ export const addToMyList = async (movie) => {
   
   return new Promise((resolve, reject) => {
     const request = store.put(item);
-    request.onsuccess = () => resolve(item);
+    request.onsuccess = () => {
+      // Trigger background scrape
+      fetch('http://127.0.0.1:5000/api/scrape-background', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: movie.title || movie.name,
+          tmdbId: movie.id
+        })
+      }).catch(err => console.log('Background scrape trigger failed:', err));
+
+      resolve(item);
+    };
     request.onerror = () => reject(request.error);
   });
 };
@@ -199,6 +216,37 @@ export const setCachedMovieDetails = async (movieId, data) => {
   
   return new Promise((resolve, reject) => {
     const request = store.put(cacheEntry);
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
+};
+
+// Video Link Persistence (Permanent / Long-term)
+export const getVideoLink = async (tmdbId) => {
+  const db = await initDB();
+  const transaction = db.transaction(['videoLinks'], 'readonly');
+  const store = transaction.objectStore('videoLinks');
+  
+  return new Promise((resolve, reject) => {
+    const request = store.get(String(tmdbId));
+    request.onsuccess = () => resolve(request.result?.url || null);
+    request.onerror = () => reject(request.error);
+  });
+};
+
+export const saveVideoLink = async (tmdbId, url) => {
+  const db = await initDB();
+  const transaction = db.transaction(['videoLinks'], 'readwrite');
+  const store = transaction.objectStore('videoLinks');
+  
+  const item = {
+    id: String(tmdbId),
+    url,
+    savedAt: Date.now()
+  };
+  
+  return new Promise((resolve, reject) => {
+    const request = store.put(item);
     request.onsuccess = () => resolve();
     request.onerror = () => reject(request.error);
   });

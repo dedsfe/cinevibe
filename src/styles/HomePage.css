@@ -73,7 +73,7 @@
 }
 
 .nav-links a.active::after {
-  content: '';
+  content: "";
   position: absolute;
   bottom: 0;
   left: 0;
@@ -451,6 +451,28 @@
   transition: transform 0.4s ease;
 }
 
+.status-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  z-index: 5;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.status-badge.available {
+  background: rgba(46, 204, 113, 0.9);
+  color: white;
+  border: none;
+  font-weight: bold;
+  box-shadow: 0 0 10px rgba(46, 204, 113, 0.4);
+}
+
 .movie-card:hover .movie-poster {
   transform: scale(1.05);
 }
@@ -587,7 +609,9 @@
   cursor: pointer;
   z-index: 10;
   opacity: 0;
-  transition: opacity 0.3s ease, background 0.2s ease;
+  transition:
+    opacity 0.3s ease,
+    background 0.2s ease;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -728,7 +752,7 @@
 }
 
 .modal-video-container::before {
-  content: '';
+  content: "";
   position: absolute;
   top: 0;
   left: 0;
@@ -975,15 +999,15 @@
     scrollbar-width: none;
     -ms-overflow-style: none;
   }
-  
+
   .brand-container::-webkit-scrollbar {
     display: none;
   }
-  
+
   .hero-title {
     font-size: 56px;
   }
-  
+
   .movie-card {
     width: 200px;
   }
@@ -994,72 +1018,72 @@
     padding: 0 20px;
     height: 60px;
   }
-  
+
   .brand-navbar {
     top: 60px;
     height: 50px;
     padding: 0 20px;
   }
-  
+
   .hero {
     margin-top: 110px;
     padding: 0 20px;
     padding-bottom: 100px;
     min-height: 600px;
   }
-  
+
   .hero-background {
     top: -110px;
   }
-  
+
   .logo {
     font-size: 24px;
   }
-  
+
   .nav-links {
     display: none;
   }
-  
+
   .brand-button {
     padding: 6px 12px;
     font-size: 12px;
   }
-  
+
   .brand-logo {
     height: 14px;
     max-width: 60px;
   }
-  
+
   .hero-title {
     font-size: 36px;
   }
-  
+
   .hero-overview {
     font-size: 14px;
     -webkit-line-clamp: 2;
   }
-  
+
   .hero-buttons {
     flex-direction: column;
     gap: 10px;
   }
-  
+
   .btn-primary,
   .btn-secondary {
     width: 100%;
     justify-content: center;
     padding: 14px 28px;
   }
-  
+
   .content-rows {
     padding: 0 20px;
     margin-top: -80px;
   }
-  
+
   .movie-card {
     width: 160px;
   }
-  
+
   .row-title {
     font-size: 20px;
   }
@@ -1090,7 +1114,7 @@
   .hero-title {
     font-size: 28px;
   }
-  
+
   .movie-card {
     width: 140px;
   }
@@ -1239,7 +1263,9 @@
   align-items: center;
   gap: 12px;
   margin: 0 auto;
-  transition: transform 0.2s, box-shadow 0.2s;
+  transition:
+    transform 0.2s,
+    box-shadow 0.2s;
 }
 
 .watch-search-btn:hover:not(:disabled) {
@@ -1301,7 +1327,9 @@
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  transition: transform 0.2s, box-shadow 0.2s;
+  transition:
+    transform 0.2s,
+    box-shadow 0.2s;
 }
 
 .watch-open-btn:hover {
@@ -1368,23 +1396,23 @@
     height: 100vh;
     max-width: 100%;
   }
-  
+
   .watch-modal-header {
     padding: 20px;
   }
-  
+
   .watch-modal-header h2 {
     font-size: 18px;
   }
-  
+
   .watch-modal-content {
     padding: 30px 20px;
   }
-  
+
   .watch-player-placeholder {
     padding: 40px 20px;
   }
-  
+
   .watch-modal-footer {
     flex-direction: column;
     gap: 12px;
