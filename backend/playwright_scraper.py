@@ -118,12 +118,21 @@ class OperaScraper:
                      self.page.click(SUBMIT_SELECTOR, timeout=2000)
             except: pass
 
-            # Wait for results
+            # Wait for results with scroll
             try:
-                # Wait for A MOVIE LINK with the title text
-                self.page.locator(f"a[href*='/movie/']").filter(has_text=title).first.wait_for(state="visible", timeout=10000)
+                # Try to find it, if not, scroll and try again
+                for _ in range(5):
+                    try:
+                        self.page.locator(f"a[href*='/movie/']").filter(has_text=title).first.wait_for(state="visible", timeout=2000)
+                        break
+                    except:
+                        self.page.mouse.wheel(0, 500)
+                        time.sleep(1)
+                
+                # Final wait check
+                self.page.locator(f"a[href*='/movie/']").filter(has_text=title).first.wait_for(state="visible", timeout=5000)
             except:
-                logging.warning(f"Title '{title}' not found in results.")
+                logging.warning(f"Title '{title}' not found in results after scrolling.")
                 return None
 
             # Find target
@@ -207,6 +216,148 @@ class OperaScraper:
             except: pass
             return None
 
+    def navigate_to_movies(self):
+        """Navigate to the main movies listing page."""
+        if not self.page:
+            if not self.start_session():
+                return False
+        
+        try:
+            movies_url = "http://web.operatopzera.net/#/movie/"
+            if self.page.url != movies_url:
+                logging.info(f"Navigating to movie catalog: {movies_url}")
+                self.page.goto(movies_url)
+                # Wait for ANY movie card to appear
+                self.page.wait_for_selector("a[href*='/movie/']", timeout=20000) 
+            return True
+        except Exception as e:
+            logging.error(f"Failed to navigate to content: {e}")
+            return False
+
+    def scrape_current_page_cards(self):
+        """Extracts (title, detail_url) from all observable cards on the screen."""
+        if not self.page:
+            return []
+            
+        items = []
+        try:
+            # Selector for movie cards - usually 'a' tags inside a grid
+            # Based on previous HTML dumps, links contain '/movie/'
+            cards = self.page.locator("a[href*='/movie/']").all()
+            logging.info(f"Found {len(cards)} card candidates on screen.")
+            
+            for card in cards:
+                try:
+                    href = card.get_attribute("href")
+                    # inner_text might contain title + year + misc info
+                    # We usually want the title. Let's get the full text and clean it later.
+                    raw_text = card.inner_text().strip()
+                    
+                    if href and "/movie/" in href and raw_text:
+                        # Clean title
+                        lines = raw_text.split('\n')
+                        cleaned_title = lines[0].strip()
+                        
+                        # Try to find a year (4 digits) in the text
+                        import re
+                        year_match = re.search(r'\b(19|20)\d{2}\b', raw_text)
+                        card_year = year_match.group(0) if year_match else None
+                        
+                        if len(cleaned_title) < 2 or cleaned_title.lower() in ["play", "assistir", "more info", "info"]:
+                            continue
+                            
+                        items.append({
+                            "raw_title": cleaned_title, 
+                            "detail_url": href,
+                            "year": card_year,
+                            "full_text": raw_text
+                        })
+                except:
+                    pass
+        except Exception as e:
+            logging.error(f"Error extracting cards: {e}")
+            
+        return items
+
+    def get_video_source(self, detail_url: str, expected_title: str = None) -> str | None:
+        """
+        Navigates to the detail page and extracts the video source.
+        Uses 'expected_title' to verify the page has correctly loaded the target movie.
+        """
+        if not self.is_running or not self.page:
+             # Auto start if needed
+             self.start_session()
+
+        try:
+            full_url = detail_url if detail_url.startswith("http") else f"http://web.operatopzera.net/{detail_url}"
+            
+            # Navigate Logic
+            # Force reload if we are 'stuck' on the timestamp or if hash didn't trigger load
+            logging.info(f"Navigating to detail page: {full_url}")
+            self.page.goto(full_url, timeout=45000)
+            
+            try:
+                self.page.wait_for_load_state("networkidle", timeout=5000)
+            except: pass
+            time.sleep(2)
+            
+            # TITLE VALIDATION (CRITICAL FIX)
+            if expected_title:
+                # Clean title for fuzzy matching (remove year, special chars)
+                import re
+                short_title = re.sub(r'\(\d{4}\)', '', expected_title).split(':')[0].strip()
+                if len(short_title) > 20: short_title = short_title[:20]
+                
+                logging.info(f"Validating page content matches title: '{short_title}'...")
+                try:
+                    # Look for h1, h2, or any strong text containing the title
+                    self.page.wait_for_selector(f"text={short_title}", timeout=10000)
+                    logging.info("  -> Page title validation PASSED.")
+                except:
+                    logging.warning(f"  -> Page validation FAILED. Title '{short_title}' not found in DOM.")
+                    # Try a reload once
+                    logging.info("  -> Retrying with RELOAD...")
+                    self.page.reload()
+                    time.sleep(5)
+                    try:
+                        self.page.wait_for_selector(f"text={short_title}", timeout=10000)
+                        logging.info("  -> Reload validation PASSED.")
+                    except:
+                        logging.error("  -> Validation FAILED after reload. Aborting to prevent mismatch.")
+                        return None
+            
+            # Play button logic
+            try:
+                play_btn = self.page.locator("a[href*='/play/'], button:has-text('Play'), button:has-text('Assistir')").first
+                if play_btn.is_visible(timeout=5000):
+                    logging.info("Clicking Play button (Forced)...")
+                    play_btn.click(force=True)
+                    time.sleep(3) # Wait for player to init
+            except: pass
+
+            # Extract Video
+            video_src = None
+            try:
+                # Increased timeout to 45s for slow loaders
+                self.page.wait_for_selector("video, iframe", timeout=45000)
+                
+                # Check video tag first
+                video_src = self.page.evaluate("document.querySelector('video') ? document.querySelector('video').src : null")
+                
+                if not video_src:
+                     # Fallback to iframe
+                     iframe = self.page.query_selector("iframe")
+                     if iframe:
+                         video_src = iframe.get_attribute("src")
+                         
+            except Exception as e:
+                logging.error(f"Error extracting video from page: {e}")
+
+            return video_src
+        except Exception as e:
+            logging.error(f"Failed to get video source from {detail_url}: {e}")
+            return None
+
 # Global instance
 _scraper_instance = None
 
@@ -224,8 +375,11 @@ def scrape_operatopzera(title: str, year: str = None) -> str | None:
     return s.scrape_title(title, year)
 
 if __name__ == "__main__":
+    # Test block
+    logging.basicConfig(level=logging.INFO)
     s = OperaScraper()
-    s.start_session(headless=True)
+    s.start_session(headless=False)
+    # s.search_and_extract("Americana") # This method does not exist in the class
     print("Scraping 'A Empregada'...")
     link = s.scrape_title("A Empregada") 
     print(f"Result: {link}")

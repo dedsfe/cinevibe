@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 
 const API_KEY = '909fc389a150847bdd4ffcd92809cff7';
 const BASE_URL = 'https://api.themoviedb.org/3';
@@ -8,11 +8,18 @@ export const useTMDB = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const fetchData = async (endpoint) => {
+  const fetchData = useCallback(async (endpoint) => {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`${BASE_URL}${endpoint}?api_key=${API_KEY}&language=en-US`);
+      const isLocal = endpoint.startsWith('/api');
+      const baseUrl = isLocal ? 'http://127.0.0.1:3000' : BASE_URL;
+      const separator = endpoint.includes('?') ? '&' : '?';
+      const url = isLocal 
+        ? `${baseUrl}${endpoint}`
+        : `${baseUrl}${endpoint}${separator}api_key=${API_KEY}&language=pt-BR`;
+
+      const response = await fetch(url);
       if (!response.ok) throw new Error('Failed to fetch');
       const data = await response.json();
       setLoading(false);
@@ -22,14 +29,15 @@ export const useTMDB = () => {
       setLoading(false);
       return null;
     }
-  };
+  }, []);
 
   return { fetchData, loading, error };
 };
 
 export const getImageUrl = (path, size = 'w500') => {
   if (!path) return null;
-  return `${IMAGE_BASE_URL}/${size}${path}`;
+  const cleanPath = path.startsWith('/') ? path.substring(1) : path;
+  return `${IMAGE_BASE_URL}/${size}/${cleanPath}`;
 };
 
 export const getBackdropUrl = (path) => getImageUrl(path, 'original');

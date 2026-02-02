@@ -1,0 +1,298 @@
+/* MovieDetailsModal.css */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.9);
+  backdrop-filter: none;
+  z-index: 2000;
+  display: flex;
+  justify-content: center; /* Horizontally center */
+  align-items: center; /* Vertically center */
+  padding: 30px; /* Reduced padding to allow modal to take more space (removed "gray bars") */
+  overflow: hidden; /* Prevent body scroll interaction */
+}
+
+.modal-content {
+  position: relative;
+  width: 95%; /* Increased width percentage */
+  max-width: 1400px; /* Greatly increased max-width for cinematic feel */
+  background: #111;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 20px 80px rgba(0,0,0,0.9);
+  margin: 0; 
+  margin-top: 15vh; /* Significantly more space on top per user request */
+  transform-origin: center center;
+  
+  /* Vertical Centering & Scroll Fixes */
+  max-height: 80vh; /* Reduced height to accommodate larger top margin */
+  display: flex;
+  flex-direction: column;
+}
+
+/* Ensure only the body scrolls, keeping the close button accessible usually, 
+   but our structure has close button inside, so we scroll the whole content 
+   container OR we make modal-body scrollable. 
+   
+   Looking at JSX: 
+   modal-content contains: button, header, body.
+   
+   To scroll correctly inside:
+*/
+.modal-content {
+  overflow-y: auto; /* Allow entire modal to scroll if needed */
+  overscroll-behavior: contain;
+}
+
+.modal-close {
+  position: absolute;
+  top: 15px;
+  right: 15px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.5);
+  border: none !important;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 100;
+  transition: all 0.2s ease;
+}
+
+.modal-close:hover {
+  background: rgba(255, 255, 255, 0.1);
+  transform: rotate(90deg);
+}
+
+.modal-header {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: #000;
+  overflow: hidden; /* Ensure zoom clipping */
+}
+
+.trailer-container,
+.modal-backdrop-fallback {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.modal-backdrop-fallback img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.modal-header iframe {
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  transform: scale(1.4); /* Increased scale to remove letterboxing/gray bars */
+}
+
+.trailer-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(0deg, #111 0%, transparent 60%);
+  z-index: 2;
+}
+
+.modal-mute-toggle {
+  position: absolute;
+  bottom: 25px;
+  right: 25px;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 10;
+  transition: all 0.2s ease;
+  backdrop-filter: none !important; /* Removed blur per user request */
+}
+
+.modal-mute-toggle:hover {
+  background: rgba(255, 255, 255, 0.1);
+  transform: scale(1.1);
+}
+
+.modal-header-info {
+  position: absolute;
+  bottom: 0px; /* Docked at the bottom */
+  left: 0;
+  width: 100%;
+  padding: 40px 15px;
+  padding-bottom: 30px; /* Closer to the bottom */
+  z-index: 3;
+}
+
+.modal-title {
+  font-size: 3.5rem;
+  font-weight: 900;
+  margin-bottom: 20px;
+  text-shadow: none; /* Removed shadow per user request */
+  color: white;
+  letter-spacing: -0.05em;
+  max-width: 95%;
+  line-height: 0.9;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 15px;
+  align-items: center;
+}
+
+/* Inherit Global Button Styles (Pill Shape) */
+.btn-primary, .btn-secondary {
+  height: 52px; /* Matched to Hero */
+  padding: 0 32px;
+  min-width: 200px; /* Matched to Hero */
+  font-size: 1rem;
+  font-weight: 700; /* Matched to Hero */
+  border-radius: 50px !important; 
+  letter-spacing: 0.1em; /* Matched to Hero */
+  text-transform: uppercase;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  border: none !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4); /* Re-added clean shadow like hero */
+}
+
+.btn-primary {
+  background: white !important;
+  color: black !important;
+}
+
+.btn-primary:hover {
+  transform: translateY(-3px) scale(1.02);
+  background: #f0f0f0 !important;
+}
+
+.btn-secondary {
+  background: rgba(42, 42, 42, 0.6) !important;
+  color: white !important;
+  backdrop-filter: none !important; /* Removed blur per user request */
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+}
+
+.btn-secondary:hover {
+  background: rgba(55, 55, 55, 0.8) !important;
+  transform: translateY(-3px);
+}
+
+.btn-secondary.active {
+  background: #E50914 !important; /* Netflix red for "In List" */
+  border-color: transparent !important;
+}
+
+.modal-body {
+  display: grid;
+  grid-template-columns: 1.8fr 1fr;
+  gap: 40px;
+  padding: 30px 15px;
+  padding-bottom: 50px;
+  background: #111;
+  align-items: start;
+}
+
+.modal-main-info {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.info-row {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  margin-bottom: 10px; /* Consistent spacing */
+}
+
+.info-year {
+  color: #a3a3a3;
+  font-weight: 600;
+  font-size: 1.1rem;
+  line-height: 1; /* Reset line height for alignment */
+}
+
+.modal-overview {
+  font-size: 1.1rem;
+  line-height: 1.6;
+  color: #d1d1d1;
+  margin: 0;
+  max-width: 100%;
+}
+
+.modal-aside-info {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding-top: 5px; /* Fine-tune vertical alignment with overview title */
+}
+
+.info-group {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.info-label {
+  color: #777;
+  font-size: 0.9rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  line-height: 1; /* Match info-year line-height logic if possible */
+}
+
+.info-value {
+  color: #eee;
+  font-size: 0.95rem;
+  line-height: 1.4;
+}
+
+/* Animations */
+@keyframes modalFade {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Mobile Responsiveness */
+@media (max-width: 768px) {
+  .modal-content {
+    width: 100%;
+    height: 100%;
+    max-height: 100vh;
+    border-radius: 0;
+    margin: 0;
+    overflow-y: auto;
+  }
+
+  .modal-title {
+    font-size: 2.2rem;
+  }
+
+  .modal-body {
+    grid-template-columns: 1fr;
+    gap: 30px;
+  }
+}

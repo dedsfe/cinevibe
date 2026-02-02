@@ -25,16 +25,17 @@ import {
 import { useTMDB, fetchCategories, getBackdropUrl, getPosterUrl, genreMap } from '../hooks/useTMDB';
 import { useMyList } from '../hooks/useDatabase';
 import { addToMyList, removeFromMyList, isInMyList } from '../db';
-import '../styles/HomePage.css';
+import MovieCard from './MovieCard';
+import MovieDetailsModal from './MovieDetailsModal';
+import Navbar from './Navbar';
+import SearchModal from './SearchModal';
 
 const streamingBrands = [
-  { id: 'all', name: 'Para Você', logo: null, active: true },
-  { id: 'netflix', name: 'Netflix', logo: 'https://upload.wikimedia.org/wikipedia/commons/0/08/Netflix_2015_logo.svg' },
-  { id: 'disney', name: 'Disney+', logo: 'https://upload.wikimedia.org/wikipedia/commons/3/3e/Disney%2B_logo.svg' },
-  { id: 'hbo', name: 'HBO Max', logo: 'https://upload.wikimedia.org/wikipedia/commons/1/17/HBO_Max_Logo.svg' },
-  { id: 'prime', name: 'Prime Video', logo: 'https://upload.wikimedia.org/wikipedia/commons/f/f1/Prime_Video.png' },
-  { id: 'apple', name: 'Apple TV+', logo: 'https://upload.wikimedia.org/wikipedia/commons/2/28/Apple_TV_Plus_Logo.svg' },
-  { id: 'paramount', name: 'Paramount+', logo: 'https://upload.wikimedia.org/wikipedia/commons/4/4e/Paramount%2B_logo.svg' },
+  { id: 'disney', name: 'Disney', logo: 'https://upload.wikimedia.org/wikipedia/commons/3/3e/Disney%2B_logo.svg', video: 'https://static-assets.bamgrid.com/product/disneyplus/images/disney.1.2.66.a0100416954a621.mp4' },
+  { id: 'pixar', name: 'Pixar', logo: 'https://upload.wikimedia.org/wikipedia/commons/d/df/Pixar_Animation_Studios_logo.svg', video: 'https://static-assets.bamgrid.com/product/disneyplus/images/pixar.1.2.66.a0100416954a621.mp4' },
+  { id: 'marvel', name: 'Marvel', logo: 'https://upload.wikimedia.org/wikipedia/commons/b/b9/Marvel_Logo.svg', video: 'https://static-assets.bamgrid.com/product/disneyplus/images/marvel.1.2.66.a0100416954a621.mp4' },
+  { id: 'starwars', name: 'Star Wars', logo: 'https://upload.wikimedia.org/wikipedia/commons/6/6c/Star_Wars_Logo.svg', video: 'https://static-assets.bamgrid.com/product/disneyplus/images/star-wars.1.2.66.a0100416954a621.mp4' },
+  { id: 'natgeo', name: 'National Geographic', logo: 'https://upload.wikimedia.org/wikipedia/commons/f/ff/National_Geographic_logo.svg', video: 'https://static-assets.bamgrid.com/product/disneyplus/images/national-geographic.1.2.66.a0100416954a621.mp4' },
 ];
 
 // Global movie cache
@@ -389,7 +390,7 @@ const WatchModal = ({ movie, onClose }) => {
     setError(null);
     
     try {
-        const response = await fetch('http://127.0.0.1:5000/api/get-embed', {
+        const response = await fetch('http://127.0.0.1:3000/api/get-embed', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -564,75 +565,9 @@ const WatchModal = ({ movie, onClose }) => {
   );
 };
 
-const MovieCard = ({ movie, index, onClick, isAvailable }) => {
-  const [isHovered, setIsHovered] = useState(false);
-  
-  const genres = movie.genre_ids?.slice(0, 2).map(id => genreMap[id]).filter(Boolean) || [];
-  
-  return (
-    <motion.div
-      className="movie-card"
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.05, duration: 0.4 }}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-      whileHover={{ scale: 1.08, zIndex: 10 }}
-      onClick={() => onClick(movie)}
-    >
-      <div className="movie-card-inner">
-        <img 
-          src={getPosterUrl(movie.poster_path)} 
-          alt={movie.title || movie.name}
-          className="movie-poster"
-          loading="lazy"
-        />
-        
-        {isAvailable && (
-          <div className="status-badge available" title="Disponível para assistir agora">
-            ⚡️
-          </div>
-        )}
-        
-        {movie.isNotFound && (
-          <div className="status-badge not-found" title="Não encontrado no catálogo">
-            ❌
-          </div>
-        )}
-        
-        <AnimatePresence>
-          {isHovered && (
-            <motion.div 
-              className="movie-card-overlay"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
-            >
-              <div className="movie-card-info">
-                <h4 className="movie-title">{movie.title || movie.name}</h4>
-                <div className="movie-meta">
-                  <span className="movie-rating">
-                    <Star size={14} fill="#ffd700" color="#ffd700" /> {movie.vote_average?.toFixed(1)}
-                  </span>
-                  <span className="movie-year">
-                    {(movie.release_date || movie.first_air_date)?.substring(0, 4)}
-                  </span>
-                </div>
-                <div className="movie-genres">
-                  {genres.map((genre, i) => (
-                    <span key={i} className="genre-tag">{genre}</span>
-                  ))}
-                </div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
-    </motion.div>
-  );
-};
+// SearchModal imported from ./SearchModal
 
+// ... existing LazyMovieRow ...
 const LazyMovieRow = ({ title, fetchEndpoint, onMovieClick }) => {
   const [movies, setMovies] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -672,13 +607,13 @@ const LazyMovieRow = ({ title, fetchEndpoint, onMovieClick }) => {
       if (data?.results) {
         const validMovies = data.results
           .filter(movie => movie.poster_path)
-          .slice(0, 15);
+          .slice(0, 100);
         
         // Batch check availability
         const tmdbIds = validMovies.map(m => m.id);
         if (tmdbIds.length > 0) {
             try {
-                const checkRes = await fetch('http://127.0.0.1:5000/api/cache/check-batch', {
+                const checkRes = await fetch('http://127.0.0.1:3000/api/cache/check-batch', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ tmdbIds })
@@ -687,19 +622,26 @@ const LazyMovieRow = ({ title, fetchEndpoint, onMovieClick }) => {
                     const checkData = await checkRes.json();
                     const statuses = checkData.statuses || {};
                     
-                    // Add status flags
+                    // Mark availability
                     validMovies.forEach(m => {
                         const status = statuses[String(m.id)];
                         m.isAvailable = status && status !== "NOT_FOUND";
-                        m.isNotFound = status === "NOT_FOUND";
                     });
+
+                    // Filter only available ones
+                    const filteredMovies = validMovies.filter(m => m.isAvailable);
+                    setMovies(filteredMovies);
+                } else {
+                    // Fallback: if check fails, show all to avoid total empty (optional, but safer for TMDB rows)
+                    setMovies(validMovies);
                 }
             } catch (err) {
                 console.warn("Failed to check batch availability", err);
+                setMovies(validMovies);
             }
+        } else {
+            setMovies(validMovies);
         }
-
-        setMovies(validMovies);
         setHasLoaded(true);
       }
     } catch (error) {
@@ -716,6 +658,9 @@ const LazyMovieRow = ({ title, fetchEndpoint, onMovieClick }) => {
       setScrollPosition(rowRef.current.scrollLeft + scrollAmount);
     }
   };
+
+  // Hide rows with < 5 movies (unless it's the Family category)
+  if (hasLoaded && movies.length < 5 && title !== "FAMÍLIA") return null;
 
   return (
     <section ref={sectionRef} className="movie-row">
@@ -764,174 +709,200 @@ const LazyMovieRow = ({ title, fetchEndpoint, onMovieClick }) => {
   );
 };
 
-const Hero = ({ featured, onMovieClick, onPlay }) => {
-  if (!featured) return null;
+const HeroCarousel = ({ items, onMovieClick }) => {
+  if (!items || items.length === 0) return null;
 
-  const genres = featured.genre_ids?.slice(0, 3).map(id => genreMap[id]).filter(Boolean) || [];
-
-  return (
-    <motion.div 
-      className="hero"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 0.8 }}
-    >
-      <div className="hero-background">
-        <img 
-          src={getBackdropUrl(featured.backdrop_path)} 
-          alt={featured.title || featured.name}
-        />
-        <div className="hero-gradient" />
-      </div>
-      
-      <motion.div 
-        className="hero-content"
-        initial={{ opacity: 0, y: 30 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.3, duration: 0.8 }}
-      >
-        <motion.span 
-          className="hero-badge"
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.5 }}
-        >
-          #1 Em Alta Hoje
-        </motion.span>
-        
-        <h1 className="hero-title">{featured.title || featured.name}</h1>
-        
-        <div className="hero-meta">
-          <span className="hero-rating">
-            <Star size={18} fill="#ffd700" color="#ffd700" /> {featured.vote_average?.toFixed(1)}
-          </span>
-          <span className="hero-year">{(featured.release_date || featured.first_air_date)?.substring(0, 4)}</span>
-          <span className="hero-type">{featured.media_type === 'tv' ? 'Série' : 'Filme'}</span>
-        </div>
-        
-        <div className="hero-genres">
-          {genres.map((genre, i) => (
-            <span key={i} className="hero-genre">{genre}</span>
-          ))}
-        </div>
-        
-        <p className="hero-overview">{featured.overview}</p>
-        
-        <div className="hero-buttons">
-          <motion.button 
-            className="btn-primary"
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={() => onPlay(featured)}
-          >
-            <Play size={24} fill="currentColor" />
-            Assistir Agora
-          </motion.button>
-          
-          <motion.button 
-            className="btn-secondary"
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={() => onMovieClick(featured)}
-          >
-            <Info size={24} />
-            Mais Informações
-          </motion.button>
-        </div>
-      </motion.div>
-    </motion.div>
-  );
-};
-
-const BrandNavbar = ({ selectedBrand, onBrandSelect }) => {
-  return (
-    <motion.div 
-      className="brand-navbar"
-      initial={{ opacity: 0, y: -20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: 0.2, duration: 0.5 }}
-    >
-      <div className="brand-container">
-        {streamingBrands.map((brand) => (
-          <motion.button
-            key={brand.id}
-            className={`brand-button ${selectedBrand === brand.id ? 'active' : ''}`}
-            onClick={() => onBrandSelect(brand.id)}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-          >
-            {brand.logo ? (
-              <img 
-                src={brand.logo} 
-                alt={brand.name}
-                className="brand-logo"
-                onError={(e) => {
-                  e.target.style.display = 'none';
-                  e.target.nextSibling.style.display = 'flex';
-                }}
-              />
-            ) : null}
-            <span className="brand-name" style={{ display: brand.logo ? 'none' : 'flex' }}>
-              {brand.name}
-            </span>
-            <span className="brand-name-fallback" style={{ display: 'none' }}>
-              {brand.name}
-            </span>
-          </motion.button>
-        ))}
-      </div>
-    </motion.div>
-  );
-};
-
-const Navbar = () => {
-  const [scrolled, setScrolled] = useState(false);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const current = items[currentIndex];
 
   useEffect(() => {
-    const handleScroll = () => {
-      setScrolled(window.scrollY > 50);
-    };
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
+    if (items.length <= 1) return;
+    const timer = setInterval(() => {
+      setCurrentIndex((prev) => (prev + 1) % items.length);
+    }, 8000);
+    return () => clearInterval(timer);
+  }, [items.length]);
 
   return (
-    <motion.nav 
-      className={`navbar ${scrolled ? 'scrolled' : ''}`}
-      initial={{ y: -100 }}
-      animate={{ y: 0 }}
-      transition={{ duration: 0.5 }}
-    >
-      <div className="nav-left">
-        <div className="logo">CineVibe</div>
-        <ul className="nav-links">
-          <li><a href="#" className="active"><Home size={18} /> Início</a></li>
-          <li><a href="#"><Film size={18} /> Filmes</a></li>
-          <li><a href="#"><Tv size={18} /> Séries</a></li>
-          <li><a href="#"><Heart size={18} /> Minha Lista</a></li>
-        </ul>
-      </div>
+    <div className="hero-carousel">
+      <AnimatePresence mode="wait">
+        <motion.div 
+          key={current.id}
+          className="hero-slide"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 1 }}
+        >
+          <div className="hero-background">
+            <img 
+              src={getBackdropUrl(current.backdrop_path)} 
+              alt={current.title || current.name}
+            />
+            <div className="hero-gradient" />
+          </div>
+          
+          <motion.div 
+            className="hero-content"
+            initial={{ opacity: 0, x: -100 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.3, duration: 0.8 }}
+          >
+            <h1 className="hero-title">{current.title || current.name}</h1>
+            <p className="hero-overview">{current.overview}</p>
+            
+            <div className="hero-buttons">
+              <motion.button 
+                className="btn-primary"
+                whileTap={{ scale: 0.95 }}
+                onClick={() => onMovieClick(current)}
+              >
+                <Play size={20} fill="currentColor" stroke="none" />
+                <span>ASSISTIR AGORA</span>
+              </motion.button>
+              
+              <motion.button 
+                className="btn-secondary"
+                whileTap={{ scale: 0.95 }}
+                onClick={() => onMovieClick(current)}
+              >
+                DETALHES
+              </motion.button>
+            </div>
+          </motion.div>
+        </motion.div>
+      </AnimatePresence>
       
-      <div className="nav-right">
-        <button className="nav-icon">
-          <Search size={22} />
-        </button>
-        <button className="nav-icon">
-          <Bell size={22} />
-        </button>
-        <div className="profile">
-          <User size={24} />
-        </div>
+      <div className="carousel-indicators">
+        {items.map((_, i) => (
+          <div 
+            key={i} 
+            className={`indicator ${i === currentIndex ? 'active' : ''}`}
+            onClick={() => setCurrentIndex(i)}
+          />
+        ))}
       </div>
-    </motion.nav>
+    </div>
   );
 };
+
+// Streaming brands with recognizable logos
+const pillBrands = [
+  { 
+    id: 'netflix', 
+    name: 'Netflix', 
+    color: '#E50914'
+  },
+  { 
+    id: 'max', 
+    name: 'Max', 
+    color: '#002BE7'
+  },
+  { 
+    id: 'disney', 
+    name: 'Disney+', 
+    color: '#113CCF'
+  },
+  { 
+    id: 'prime', 
+    name: 'Prime Video', 
+    color: '#00A8E1'
+  },
+  { 
+    id: 'paramount', 
+    name: 'Paramount+', 
+    color: '#0064FF'
+  },
+  { 
+    id: 'apple', 
+    name: 'Apple TV+', 
+    color: '#FFFFFF'
+  },
+];
+
+// SVG Icons for streaming services
+const StreamingIcon = ({ name, color, size = 28 }) => {
+  const icons = {
+    netflix: (
+      <svg viewBox="0 0 111 300" width={size} height={size * 2.7} fill={color}>
+        <path d="M55.5 0L55.5 112.5L55.5 0M55.5 187.5L55.5 300L55.5 187.5" stroke={color} strokeWidth="40"/>
+        <path d="M0 0L55.5 112.5L111 0M0 300L55.5 187.5L111 300" stroke={color} strokeWidth="40" fill="none"/>
+      </svg>
+    ),
+    max: (
+      <svg viewBox="0 0 300 150" width={size * 2} height={size} fill={color}>
+        <path d="M0 0H50V100H0V0ZM60 50L85 0H100L125 50L150 0H165L140 50L165 100H140L115 50L90 100H65L90 50L65 0H40L60 50Z" fill="white"/>
+        <circle cx="185" cy="50" r="50" fill={color}/>
+      </svg>
+    ),
+    disney: (
+      <svg viewBox="0 0 400 200" width={size * 2} height={size} fill={color}>
+        <text x="20" y="120" fontFamily="serif" fontSize="80" fontWeight="bold" fill="white">Disney</text>
+        <text x="280" y="120" fontFamily="sans-serif" fontSize="60" fill={color}>+</text>
+        <path d="M220 130 A 30 30 0 1 1 220 170" fill="none" stroke={color} strokeWidth="3"/>
+      </svg>
+    ),
+    prime: (
+      <svg viewBox="0 0 400 150" width={size * 2.7} height={size} fill={color}>
+        <text x="10" y="90" fontFamily="sans-serif" fontSize="60" fontWeight="bold" fill="#00A8E1">prime</text>
+        <text x="200" y="90" fontFamily="sans-serif" fontSize="40" fill="white">video</text>
+        <path d="M320 40 Q 350 60 350 90 Q 350 120 320 120" fill="none" stroke="#FF9900" strokeWidth="8" strokeLinecap="round"/>
+      </svg>
+    ),
+    paramount: (
+      <svg viewBox="0 0 300 150" width={size * 2} height={size} fill={color}>
+        <polygon points="150,20 280,130 20,130" fill="#0064FF"/>
+        <text x="75" y="115" fontFamily="sans-serif" fontSize="35" fontWeight="bold" fill="white">Paramount</text>
+        <text x="240" y="115" fontFamily="sans-serif" fontSize="40" fill="white">+</text>
+        <circle cx="150" cy="90" r="8" fill="white"/>
+      </svg>
+    ),
+    apple: (
+      <svg viewBox="0 0 300 100" width={size * 3} height={size} fill={color}>
+        <path d="M85 30 C 85 20, 95 15, 105 20 C 100 10, 85 10, 75 20 C 70 25, 70 35, 75 40 C 65 45, 55 40, 50 30 C 45 40, 55 55, 70 55 C 65 65, 55 75, 40 70 C 50 85, 75 90, 90 75 C 100 90, 130 85, 140 70 C 125 75, 115 65, 110 55 C 125 55, 135 40, 130 30 C 125 40, 115 45, 105 40 C 110 35, 110 25, 105 20" fill="white"/>
+        <text x="150" y="60" fontFamily="sans-serif" fontSize="35" fill="white">TV+</text>
+      </svg>
+    ),
+  };
+  
+  return icons[name] || null;
+};
+
+const BrandPillNavbar = () => {
+  return (
+    <div className="brand-pill-container">
+      <div className="brand-pill-navbar">
+        <motion.button 
+          className="brand-pill-item active"
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+        >
+          <span className="brand-pill-text">Para Você</span>
+        </motion.button>
+        {pillBrands.map((brand) => (
+          <motion.div 
+            key={brand.id} 
+            className="brand-pill-item"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            title={brand.name}
+          >
+            <StreamingIcon name={brand.id} color={brand.color} size={24} />
+          </motion.div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// Navbar imported from ./Navbar
 
 const HomePage = () => {
   const navigate = useNavigate();
   const [selectedBrand, setSelectedBrand] = useState('all');
   const [selectedMovie, setSelectedMovie] = useState(null);
   const [selectedWatchMovie, setSelectedWatchMovie] = useState(null);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [allMovies, setAllMovies] = useState([]);
   const [allTVShows, setAllTVShows] = useState([]);
   const [featured, setFeatured] = useState(null);
@@ -939,41 +910,39 @@ const HomePage = () => {
   const { myList, loading: myListLoading, refresh: refreshMyList } = useMyList();
 
   const handleMovieClick = (movie) => {
-    console.log("Movie clicked:", movie);
-    if (!movie || !movie.id) {
-        console.error("Invalid movie object:", movie);
-        return;
-    }
-    console.log("Navigating to:", `/watch/${movie.id}`);
-    navigate(`/watch/${movie.id}`, { state: { movie } });
+    setSelectedMovie(movie);
+  };
+
+  const closeModal = () => {
+    setSelectedMovie(null);
+  };
+
+  const handleSearchClose = () => {
+    setIsSearchOpen(false);
   };
 
   // Load movies and TV shows separately
   useEffect(() => {
     const loadContent = async () => {
       try {
-        // Fetch movies and TV shows separately with delay
         const moviesData = await fetchData('/movie/popular');
         await new Promise(resolve => setTimeout(resolve, 300));
         
         const tvData = await fetchData('/tv/popular');
         
-        // Process movies
         const movies = (moviesData?.results || [])
           .filter(item => item.poster_path)
           .map(item => ({ ...item, media_type: 'movie' }))
-          .slice(0, 20);
+          .slice(0, 50);
         
-        // Process TV shows
         const tvShows = (tvData?.results || [])
           .filter(item => item.poster_path)
           .map(item => ({ ...item, media_type: 'tv' }))
-          .slice(0, 20);
+          .slice(0, 50);
         
         setAllMovies(movies);
         setAllTVShows(tvShows);
         
-        // Set featured from movies
         if (movies.length > 0) {
           setFeatured(movies[0]);
         }
@@ -989,91 +958,71 @@ const HomePage = () => {
   const getMoviesByGenre = (genreId) => {
     return allMovies.filter(movie =>
       movie.genre_ids?.includes(genreId)
-    ).slice(0, 12);
-  };
-
-  // Get trending movies
-  const getTrendingMovies = () => {
-    return allMovies.slice(0, 20);
-  };
-
-  // Get popular movies
-  const getPopularMovies = () => {
-    return allMovies
-      .sort((a, b) => (b.popularity || 0) - (a.popularity || 0))
-      .slice(0, 20);
-  };
-
-  // Get top rated movies
-  const getTopRatedMovies = () => {
-    return allMovies
-      .sort((a, b) => (b.vote_average || 0) - (a.vote_average || 0))
-      .slice(0, 20);
+    ).slice(0, 50);
   };
 
   return (
     <div className="homepage">
-      <Navbar />
-      <BrandNavbar selectedBrand={selectedBrand} onBrandSelect={setSelectedBrand} />
-      <Hero featured={featured} onMovieClick={handleMovieClick} onPlay={handleMovieClick} />
+      <Navbar onSearchClick={() => setIsSearchOpen(true)} />
+      <HeroCarousel 
+        items={allMovies.slice(0, 5)} 
+        onMovieClick={handleMovieClick}
+      />
       
-      <div className="content-rows">
-        {selectedBrand === 'all' ? (
-          <>
-            {myList.length > 0 && (
-              <section className="movie-row">
-                <h2 className="row-title">Minha Lista</h2>
-                <div className="row-container">
-                  <div className="movies-slider">
-                    {myList.map((movie, index) => (
-                      <MovieCard 
-                        key={`${movie.id}-${index}`} 
-                        movie={movie} 
-                        index={index} 
-                        onClick={handleMovieClick}
-                      />
-                    ))}
-                  </div>
-                </div>
-              </section>
-            )}
-            <LazyMovieRow title="Filmes Populares" fetchEndpoint="/movie/popular" onMovieClick={handleMovieClick} />
-            <LazyMovieRow title="Séries Populares" fetchEndpoint="/tv/popular" onMovieClick={handleMovieClick} />
-            <LazyMovieRow title="Em Alta" fetchEndpoint="/trending/all/week" onMovieClick={handleMovieClick} />
-            <LazyMovieRow title="Mais Bem Avaliados" fetchEndpoint="/movie/top_rated" onMovieClick={handleMovieClick} />
-          </>
-        ) : selectedBrand === 'netflix' ? (
-          <>
-            <LazyMovieRow title="Netflix - Filmes Populares" fetchEndpoint="/movie/popular" onMovieClick={handleMovieClick} />
-            <LazyMovieRow title="Netflix - Séries Populares" fetchEndpoint="/tv/popular" onMovieClick={handleMovieClick} />
-          </>
-        ) : selectedBrand === 'disney' ? (
-          <>
-            <LazyMovieRow title="Disney+ - Filmes Populares" fetchEndpoint="/movie/popular" onMovieClick={handleMovieClick} />
-            <LazyMovieRow title="Disney+ - Séries Populares" fetchEndpoint="/tv/popular" onMovieClick={handleMovieClick} />
-          </>
-        ) : selectedBrand === 'hbo' ? (
-          <>
-            <LazyMovieRow title="HBO Max - Filmes Populares" fetchEndpoint="/movie/popular" onMovieClick={handleMovieClick} />
-            <LazyMovieRow title="HBO Max - Séries Populares" fetchEndpoint="/tv/popular" onMovieClick={handleMovieClick} />
-          </>
-        ) : selectedBrand === 'prime' ? (
-          <>
-            <LazyMovieRow title="Prime Video - Filmes Populares" fetchEndpoint="/movie/popular" onMovieClick={handleMovieClick} />
-            <LazyMovieRow title="Prime Video - Séries Populares" fetchEndpoint="/tv/popular" onMovieClick={handleMovieClick} />
-          </>
-        ) : selectedBrand === 'apple' ? (
-          <>
-            <LazyMovieRow title="Apple TV+ - Filmes Populares" fetchEndpoint="/movie/popular" onMovieClick={handleMovieClick} />
-            <LazyMovieRow title="Apple TV+ - Séries Populares" fetchEndpoint="/tv/popular" onMovieClick={handleMovieClick} />
-          </>
-        ) : selectedBrand === 'paramount' ? (
-          <>
-            <LazyMovieRow title="Paramount+ - Filmes Populares" fetchEndpoint="/movie/popular" onMovieClick={handleMovieClick} />
-            <LazyMovieRow title="Paramount+ - Séries Populares" fetchEndpoint="/tv/popular" onMovieClick={handleMovieClick} />
-          </>
-        ) : null}
+      <div className="content-container">
+        <LazyMovieRow 
+          title="CATÁLOGO ORIGINAL" 
+          fetchEndpoint="/api/catalog?limit=100"
+          onMovieClick={handleMovieClick}
+        />
+
+        <LazyMovieRow 
+          title="EM ALTA" 
+          fetchEndpoint="/api/catalog?limit=100&sort=trending"
+          onMovieClick={handleMovieClick}
+        />
+        {myList.length > 0 && (
+          <section className="movie-row">
+            <h2 className="row-title">Minha Lista</h2>
+            <div className="row-container">
+              <div className="movies-slider">
+                {myList.map((movie, index) => (
+                  <MovieCard 
+                    key={`${movie.id}-${index}`} 
+                    movie={movie} 
+                    index={index} 
+                    onClick={handleMovieClick}
+                  />
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
+        <LazyMovieRow title="EM ALTA (MUNDIAL)" fetchEndpoint="/trending/all/day" onMovieClick={handleMovieClick} />
+        <LazyMovieRow title="AÇÃO & AVENTURA" fetchEndpoint={fetchCategories.action} onMovieClick={handleMovieClick} />
+        <LazyMovieRow title="COMÉDIA" fetchEndpoint={fetchCategories.comedy} onMovieClick={handleMovieClick} />
+        <LazyMovieRow title="TERROR & SUSPENSE" fetchEndpoint={fetchCategories.horror} onMovieClick={handleMovieClick} />
+        <LazyMovieRow title="FICÇÃO CIENTÍFICA" fetchEndpoint={fetchCategories.scifi} onMovieClick={handleMovieClick} />
+        <LazyMovieRow title="DRAMA" fetchEndpoint={fetchCategories.drama} onMovieClick={handleMovieClick} />
+        <LazyMovieRow title="FAMÍLIA" fetchEndpoint={fetchCategories.family} onMovieClick={handleMovieClick} />
+        <LazyMovieRow title="ANIMAÇÃO" fetchEndpoint={fetchCategories.animation} onMovieClick={handleMovieClick} />
+        <LazyMovieRow title="FANTASIA" fetchEndpoint={fetchCategories.fantasy} onMovieClick={handleMovieClick} />
+        <LazyMovieRow title="DOCUMENTÁRIOS" fetchEndpoint={fetchCategories.documentary} onMovieClick={handleMovieClick} />
+        <LazyMovieRow title="MAIS VOTADOS" fetchEndpoint={fetchCategories.topRated} onMovieClick={handleMovieClick} />
       </div>
+
+      {isSearchOpen && (
+        <SearchModal onClose={handleSearchClose} onMovieClick={handleMovieClick} />
+      )}
+      
+      <AnimatePresence>
+        {selectedMovie && (
+          <MovieDetailsModal 
+            movie={selectedMovie} 
+            onClose={closeModal} 
+          />
+        )}
+      </AnimatePresence>
       
       <footer className="footer">
         <div className="footer-content">

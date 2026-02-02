@@ -10,22 +10,27 @@ def debug_search():
         scraper.start_session(headless=True)
         page = scraper.page
         
-        # Navigate to search if not already (start_session leaves us there)
-        page.goto("http://web.operatopzera.net/#/movie/search/")
+        # Navigate to search if not already (start_session leaves    try:
+        page.goto("http://web.operatopzera.net/#/movie/", timeout=60000)
+        page.wait_for_load_state("networkidle", timeout=10000)
+        time.sleep(5)
         
-        title = "Housemaid"
-        logging.info(f"Searching for: {title}")
+        print("Page Title:", page.title())
+        print("URL:", page.url)
         
-        INPUT_SELECTOR = "input[placeholder='Search stream...']"
-        page.wait_for_selector(INPUT_SELECTOR, state="visible")
-        page.fill(INPUT_SELECTOR, "")
-        page.fill(INPUT_SELECTOR, title)
+        # Dump some HTML
+        content = page.content()
+        print("HTML Snippet:", content[:5000]) # First 5k chars
         
-        # Verify input
-        val = page.input_value(INPUT_SELECTOR)
-        logging.info(f"Input value verified: '{val}'")
-        
-        page.keyboard.press("Enter")
+        # Try to find class names of grid items
+        print("Searching for grid items...")
+        # Check for common grid classes or just listing all divs
+        divs = page.locator("div[class*='container'], div[class*='grid'], div[class*='list']").all()
+        for i, div in enumerate(divs[:5]):
+            print(f"Div {i} class: {div.get_attribute('class')}")
+            
+    except Exception as e:
+        print(f"Error: {e}")
         
         # Click submit if exists
         try:

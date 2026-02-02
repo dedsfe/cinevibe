@@ -1,0 +1,90 @@
+.search-page {
+  min-height: 100vh;
+  background: #141414;
+  padding: 100px 4% 40px;
+  color: #fff;
+}
+
+.search-header {
+  max-width: 1200px;
+  margin: 0 auto 40px;
+}
+
+.search-bar-container {
+  position: relative;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.search-icon {
+  position: absolute;
+  left: 20px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #888;
+}
+
+.search-input {
+  width: 100%;
+  padding: 20px 20px 20px 60px;
+  background: #2a2a2a;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  color: #fff;
+  font-size: 24px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+.search-input:focus {
+  outline: none;
+  background: #333;
+  border-color: rgba(255, 255, 255, 0.3);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.search-input::placeholder {
+  color: #555;
+}
+
+.search-results-container {
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.results-header {
+  font-size: 20px;
+  color: #888;
+  margin-bottom: 24px;
+}
+
+.movies-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 24px;
+  justify-content: center;
+}
+
+/* Reuse existing MovieCard styles? Yes, MovieCard has .movie-card class */
+/* But we need to override width as MovieCard has fixed width 220px in HomePage.css */
+/* We should handle this in MovieCard or override here */
+
+.search-page .movie-card {
+  width: 100%; /* Check if this works with flex logic in MovieCard */
+}
+
+.search-loading, .search-empty {
+  text-align: center;
+  margin-top: 100px;
+  color: #666;
+  font-size: 18px;
+}
+
+.loading-spinner {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}

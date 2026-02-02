@@ -8,7 +8,7 @@ const ScraperStatus = () => {
 
   const fetchStatus = async () => {
     try {
-      const res = await fetch('http://127.0.0.1:5000/api/scraper/status');
+      const res = await fetch('http://127.0.0.1:3000/api/scraper/status');
       if (res.ok) {
         const data = await res.json();
         setStatus(data);
