@@ -149,7 +149,8 @@ def root():
         "endpoints": {
             "health": "/api/health",
             "catalog": "/api/catalog",
-            "series": "/api/series"
+            "series": "/api/series",
+            "search": "/api/search/all"
         }
     })
 
