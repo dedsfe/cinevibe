@@ -60,10 +60,16 @@
   backdrop-filter: blur(10px);
 }
 
-.netflix-modal-close:hover {
-  background: rgba(255, 255, 255, 0.1);
-  transform: rotate(90deg) scale(1.1);
-  border-color: rgba(255, 255, 255, 0.4);
+@media (hover: hover) {
+  .netflix-modal-close:hover {
+    background: rgba(255, 255, 255, 0.1);
+    transform: rotate(90deg) scale(1.1);
+    border-color: rgba(255, 255, 255, 0.4);
+  }
+}
+ 
+.netflix-modal-close:active {
+  transform: scale(0.95);
 }
 
 /* Hero Section - Video 100% */
@@ -131,10 +137,12 @@
   backdrop-filter: blur(10px);
 }
 
-.netflix-mute-btn:hover {
-  background: rgba(255, 255, 255, 0.15);
-  transform: scale(1.1);
-  border-color: rgba(255, 255, 255, 0.5);
+@media (hover: hover) {
+  .netflix-mute-btn:hover {
+    background: rgba(255, 255, 255, 0.15);
+    transform: scale(1.1);
+    border-color: rgba(255, 255, 255, 0.5);
+  }
 }
 
 /* Hero Info Overlay */
@@ -219,10 +227,15 @@
   color: black !important;
 }
 
-.netflix-btn-play:hover {
-  transform: translateY(-3px) scale(1.02);
-  background: #f0f0f0 !important;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+@media (hover: hover) {
+  .netflix-btn-play:hover {
+    transform: translateY(-3px) scale(1.02);
+    background: #f0f0f0 !important;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+  }
+}
+.netflix-btn-play:active {
+  transform: scale(0.95);
 }
 
 /* Botão Lista - Estilo btn-secondary da Home */
@@ -245,10 +258,15 @@
   backdrop-filter: blur(10px);
 }
 
-.netflix-btn-list:hover {
-  background: rgba(55, 55, 55, 0.8) !important;
-  transform: translateY(-3px);
-  border-color: rgba(255, 255, 255, 0.5);
+@media (hover: hover) {
+  .netflix-btn-list:hover {
+    background: rgba(55, 55, 55, 0.8) !important;
+    transform: translateY(-3px);
+    border-color: rgba(255, 255, 255, 0.5);
+  }
+}
+.netflix-btn-list:active {
+  transform: scale(0.95);
 }
 
 .netflix-btn-list.in-list {
@@ -256,8 +274,10 @@
   border-color: var(--success);
 }
 
-.netflix-btn-list.in-list:hover {
-  background: #1ea54b !important;
+@media (hover: hover) {
+  .netflix-btn-list.in-list:hover {
+    background: #1ea54b !important;
+  }
 }
 
 /* Modal Body */
@@ -343,10 +363,18 @@
   border: 1px solid var(--glass-border);
 }
 
-.netflix-similar-card:hover {
-  transform: scale(1.03);
-  border-color: var(--glass-border-hover);
-  box-shadow: var(--glass-shadow);
+@media (hover: hover) {
+  .netflix-similar-card:hover {
+    transform: scale(1.03);
+    border-color: var(--glass-border-hover);
+    box-shadow: var(--glass-shadow);
+  }
+  .netflix-similar-card:hover .netflix-similar-poster {
+    transform: scale(1.05);
+  }
+}
+.netflix-similar-card:active {
+  transform: scale(0.97);
 }
 
 .netflix-similar-poster {
@@ -356,9 +384,7 @@
   transition: transform var(--transition-slow);
 }
 
-.netflix-similar-card:hover .netflix-similar-poster {
-  transform: scale(1.05);
-}
+
 
 .netflix-similar-info {
   padding: var(--space-md);
@@ -431,14 +457,35 @@
     margin-bottom: 4px;
   }
   
-  .netflix-hero-info {
-    padding: var(--space-lg);
-    background: linear-gradient(to top, var(--bg-secondary) 0%, rgba(20,20,20,0.8) 50%, transparent 100%);
-    padding-bottom: 0;
-  }
-  
   .netflix-modal-hero {
-    aspect-ratio: 16 / 10; /* Slightly taller on mobile */
+    aspect-ratio: auto;
+    height: auto;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .netflix-video-container,
+  .netflix-backdrop-container {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    height: auto;
+  }
+
+  .netflix-video-gradient,
+  .netflix-backdrop-gradient {
+    display: none; /* Remove overlay gradient on mobile so video is clear */
+  }
+
+  .netflix-hero-info {
+    position: relative;
+    bottom: auto;
+    left: auto;
+    right: auto;
+    padding: var(--space-lg);
+    background: var(--bg-secondary);
+    padding-bottom: 0px;
+    margin-top: -5px; /* Tiny overlap to prevent gap lines */
   }
   
   .netflix-modal-body {
@@ -569,10 +616,25 @@
   transition: all var(--transition-fast);
 }
 
-.netflix-episode-item:hover {
-  background: rgba(255, 255, 255, 0.05);
-  border-color: var(--glass-border-hover);
-  transform: translateX(4px);
+@media (hover: hover) {
+  .netflix-episode-item:hover {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: var(--glass-border-hover);
+    transform: translateX(4px);
+  }
+  .netflix-episode-item:hover .netflix-episode-number {
+    color: var(--primary);
+  }
+  .netflix-episode-item:hover .netflix-episode-image img {
+    transform: scale(1.05);
+  }
+  .netflix-episode-item:hover .netflix-episode-play-overlay {
+    opacity: 1;
+  }
+}
+.netflix-episode-item:active {
+  background: rgba(255, 255, 255, 0.08); 
+  transform: scale(0.98);
 }
 
 .netflix-episode-number {

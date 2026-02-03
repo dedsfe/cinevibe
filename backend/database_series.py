@@ -209,6 +209,46 @@ def get_series_episodes(series_id):
         return [dict(row) for row in c.fetchall()]
 
 
+def search_series_locally(query: str, limit=50):
+    """Search for series in the local database."""
+    if not query:
+        return []
+
+    with get_conn() as conn:
+        conn.row_factory = sqlite3.Row
+        c = conn.cursor()
+        c.execute(
+            """
+            SELECT id, title, overview, poster_path, backdrop_path, tmdb_id, year, rating
+            FROM series
+            WHERE title LIKE ?
+            ORDER BY 
+              CASE WHEN title LIKE ? THEN 1 ELSE 2 END,
+              created_at DESC
+            LIMIT ?
+        """,
+            (f"%{query}%", f"{query}%", limit),
+        )
+        rows = c.fetchall()
+
+        results = []
+        for row in rows:
+            results.append(
+                {
+                    "id": row["tmdb_id"] or row["id"],
+                    "title": row["title"],
+                    "poster_path": row["poster_path"],
+                    "backdrop_path": row["backdrop_path"],
+                    "overview": row["overview"],
+                    "release_date": str(row["year"]) if row["year"] else "",
+                    "media_type": "tv",
+                    "vote_average": row["rating"],
+                    "isAvailable": True,
+                }
+            )
+        return results
+
+
 def get_stats():
     """Retorna estatísticas do banco"""
     with get_conn() as conn:

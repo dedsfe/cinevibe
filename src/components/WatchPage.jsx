@@ -29,6 +29,24 @@ const WatchPage = () => {
     return proxyUrl;
   };
 
+  // Save Watch History
+  useEffect(() => {
+    if (movieDetails && movieDetails.seasonNumber && movieDetails.episodeNumber) {
+        try {
+            const history = JSON.parse(localStorage.getItem('cinevibe_watch_history') || '{}');
+            history[id] = {
+                seasonNumber: movieDetails.seasonNumber,
+                episodeNumber: movieDetails.episodeNumber,
+                timestamp: Date.now()
+            };
+            localStorage.setItem('cinevibe_watch_history', JSON.stringify(history));
+            console.log("Progress Saved:", history[id]);
+        } catch (e) {
+            console.error("Error saving watch history:", e);
+        }
+    }
+  }, [movieDetails, id]);
+
   useEffect(() => {
     const init = async () => {
         setLoading(true);

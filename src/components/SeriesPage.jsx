@@ -21,6 +21,7 @@ const SeriesPage = () => {
     const [selectedSeries, setSelectedSeries] = useState(null);
     const [stats, setStats] = useState({ total: 0 });
     const [error, setError] = useState(null);
+    const [visibleCount, setVisibleCount] = useState(24);
     const navigate = useNavigate();
 
     useEffect(() => {
@@ -40,7 +41,25 @@ const SeriesPage = () => {
     const fetchSeries = async () => {
         try {
             setLoading(true);
-            console.log("[SeriesPage] Fetching series...");
+            
+            // CACHE CHECK
+            const CACHE_KEY = 'cinevibe_series_cache';
+            const CACHE_DURATION = 1000 * 60 * 10; // 10 minutes
+            
+            const cached = sessionStorage.getItem(CACHE_KEY);
+            if (cached) {
+                const { data, timestamp } = JSON.parse(cached);
+                if (Date.now() - timestamp < CACHE_DURATION) {
+                    console.log("[SeriesPage] Using cached series data");
+                    setSeries(data);
+                    setFilteredSeries(data);
+                    setStats({ total: data.length });
+                    setLoading(false);
+                    return;
+                }
+            }
+
+            console.log("[SeriesPage] Fetching series from API...");
             const response = await fetch(`${API_BASE_URL}/series?limit=1000`);
             console.log("[SeriesPage] Response status:", response.status);
             if (response.ok) {
@@ -56,6 +75,12 @@ const SeriesPage = () => {
                 setStats({ total: data.total || allSeries.length });
                 setSeries(allSeries);
                 setFilteredSeries(allSeries);
+                
+                // SAVE TO CACHE
+                sessionStorage.setItem(CACHE_KEY, JSON.stringify({
+                    data: allSeries,
+                    timestamp: Date.now()
+                }));
             } else {
                 console.error("[SeriesPage] Response not OK:", response.statusText);
             }
@@ -108,8 +133,11 @@ const SeriesPage = () => {
         <div className="homepage">
             <Navbar onSearchClick={() => setIsSearchOpen(true)} />
             
-            <div className="content-container catalog-container">
+            <div style={{ marginTop: '110px', display: 'flex', justifyContent: 'center', position: 'relative', zIndex: 10 }}>
                 <MobileToggle />
+            </div>
+
+            <div className="content-container catalog-container" style={{ paddingTop: '20px' }}>
                 <div className="catalog-header">
                     <h1 className="row-title">
                         <Tv size={32} style={{ marginRight: '12px', verticalAlign: 'middle' }} />
@@ -136,18 +164,38 @@ const SeriesPage = () => {
                         <span>Carregando séries...</span>
                     </div>
                 ) : (
-                    <div className="catalog-grid">
-                        {filteredSeries.map((s, index) => (
-                           <div key={s.id || index} className="grid-item">
-                               <MovieCard 
-                                    movie={s} 
-                                    index={index} 
-                                    onClick={handleSeriesClick}
-                                    isAvailable={true}
-                               />
-                           </div>
-                        ))}
-                    </div>
+                    <>
+                        <div className="catalog-grid">
+                            {filteredSeries.slice(0, visibleCount).map((s, index) => (
+                               <div key={s.id || index} className="grid-item">
+                                   <MovieCard 
+                                        movie={s} 
+                                        index={index} 
+                                        onClick={handleSeriesClick}
+                                        isAvailable={true}
+                                   />
+                               </div>
+                            ))}
+                        </div>
+                        
+                        {visibleCount < filteredSeries.length && (
+                            <div style={{ display: 'flex', justifyContent: 'center', marginTop: '40px' }}>
+                                <button 
+                                    className="netflix-btn-play"
+                                    onClick={() => setVisibleCount(prev => prev + 24)}
+                                    style={{ 
+                                        minWidth: '200px', 
+                                        background: 'rgba(255, 255, 255, 0.1) !important',
+                                        backdropFilter: 'blur(10px)',
+                                        color: 'white !important',
+                                        border: '1px solid rgba(255, 255, 255, 0.1)'
+                                    }}
+                                >
+                                    Carregar Mais
+                                </button>
+                            </div>
+                        )}
+                    </>
                 )}
                 
                 {!loading && filteredSeries.length === 0 && !error && (

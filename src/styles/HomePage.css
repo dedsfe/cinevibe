@@ -393,10 +393,12 @@ section.movie-row {
   transition: all var(--transition-base);
 }
 
-.movie-card:hover .movie-card-inner {
-  transform: translateY(-8px) scale(1.02);
-  border-color: var(--glass-border-hover);
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+@media (hover: hover) {
+  .movie-card:hover .movie-card-inner {
+    transform: translateY(-8px) scale(1.02);
+    border-color: var(--glass-border-hover);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+  }
 }
 
 .movie-poster {
@@ -406,8 +408,10 @@ section.movie-row {
   transition: transform var(--transition-slow);
 }
 
-.movie-card:hover .movie-poster {
-  transform: scale(1.05);
+@media (hover: hover) {
+  .movie-card:hover .movie-poster {
+    transform: scale(1.05);
+  }
 }
 
 /* Overlay com informações minimalistas - sem escurecimento */
@@ -1425,4 +1429,13 @@ section.movie-row {
   .scroll-button {
     display: none;
   }
+}
+
+/* Global Touch Optimization */
+button, 
+.movie-card, 
+.grid-item, 
+.toggle-btn {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }

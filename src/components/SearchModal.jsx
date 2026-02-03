@@ -44,28 +44,16 @@ const SearchModal = ({ onClose, onMovieClick }) => {
 
       setIsSearching(true);
       try {
-        const data = await fetchData(`/search/movie?query=${encodeURIComponent(query)}`);
+        // Search exclusively in local database
+        const response = await fetch(`${API_BASE_URL}/api/movies/search?q=${encodeURIComponent(query)}`);
+        const data = await response.json();
+        
         if (data?.results) {
-          const validResults = data.results.filter(m => m.poster_path).slice(0, 10);
-          setResults(validResults);
-          
-          // Check availability
-          const tmdbIds = validResults.map(m => m.id);
-          if (tmdbIds.length > 0) {
-            try {
-              const res = await fetch(`${API_BASE_URL}/cache/check-batch`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ tmdbIds })
-              });
-              if (res.ok) {
-                const checkData = await res.json();
-                setAvailability(checkData.statuses || {});
-              }
-            } catch (err) {
-              console.warn("Availability check failed", err);
-            }
-          }
+          setResults(data.results);
+          // Local results are always available
+          const availMap = {};
+          data.results.forEach(m => availMap[m.id] = true);
+          setAvailability(availMap);
         }
       } catch (error) {
         console.error("Search failed", error);
@@ -75,7 +63,7 @@ const SearchModal = ({ onClose, onMovieClick }) => {
     }, 500);
 
     return () => clearTimeout(timer);
-  }, [query, fetchData]);
+  }, [query]);
 
   return (
     <motion.div 
@@ -127,14 +115,12 @@ const SearchModal = ({ onClose, onMovieClick }) => {
                     alt={movie.title} 
                     className="search-result-poster"
                   />
-                  <div className="search-result-info">
+                    <div className="search-result-info">
                     <h4>{movie.title}</h4>
                     <span className="search-result-year">
                       {(movie.release_date || '').substring(0, 4)}
                     </span>
-                    {availability[movie.id] && availability[movie.id] !== "NOT_FOUND" && (
-                      <span className="search-result-badge">⚡️ Disponível</span>
-                    )}
+                    <span className="search-result-badge">⚡️ Disponível</span>
                   </div>
                 </div>
               ))}

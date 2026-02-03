@@ -106,8 +106,11 @@ const MoviesPage = () => {
         <div className="homepage">
             <Navbar onSearchClick={() => setIsSearchOpen(true)} />
             
-            <div className="content-container catalog-container">
+            <div style={{ marginTop: '110px', display: 'flex', justifyContent: 'center', position: 'relative', zIndex: 10 }}>
                 <MobileToggle />
+            </div>
+
+            <div className="content-container catalog-container" style={{ paddingTop: '20px' }}>
                 <div className="catalog-header">
                     <h1 className="row-title">CATÁLOGO COMPLETO</h1>
                 </div>

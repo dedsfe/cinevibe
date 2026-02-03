@@ -31,6 +31,7 @@ const MovieDetailsModal = ({ movie, onClose }) => {
   const [selectedSeason, setSelectedSeason] = useState(null);
   const [selectedSeasonNumber, setSelectedSeasonNumber] = useState(null);
   const [loadingSeries, setLoadingSeries] = useState(false);
+  const [nextEpisode, setNextEpisode] = useState(null);
   const iframeRef = React.useRef(null);
   const { fetchData } = useTMDB();
   const navigate = useNavigate();
@@ -113,6 +114,48 @@ const MovieDetailsModal = ({ movie, onClose }) => {
     }
   };
 
+  // Calculate Next Episode based on History
+  useEffect(() => {
+    if (isSeries && seriesData?.seasons) {
+        try {
+            const history = JSON.parse(localStorage.getItem('cinevibe_watch_history') || '{}');
+            const progress = history[movie.id];
+
+            if (progress) {
+                console.log("Found progress for", movie.title, progress);
+                // Find current season/episode in data
+                const season = seriesData.seasons.find(s => s.season_number === progress.seasonNumber);
+                if (season) {
+                    // Try next episode in same season
+                    const nextEp = season.episodes?.find(e => e.episode_number === progress.episodeNumber + 1);
+                    if (nextEp) {
+                        setNextEpisode({
+                            ...nextEp,
+                            seasonNumber: season.season_number,
+                            seasonId: season.id // ensure we have context
+                        });
+                        return;
+                    }
+                }
+                
+                // If no next ep in season, try next season (Ep 1)
+                const nextSeason = seriesData.seasons.find(s => s.season_number === progress.seasonNumber + 1);
+                if (nextSeason && nextSeason.episodes?.length > 0) {
+                     const firstEp = nextSeason.episodes[0];
+                     setNextEpisode({
+                        ...firstEp,
+                        seasonNumber: nextSeason.season_number,
+                        seasonId: nextSeason.id
+                     });
+                     return;
+                }
+            }
+        } catch (e) {
+            console.error("Error calculating next episode:", e);
+        }
+    }
+  }, [isSeries, seriesData, movie.id]);
+
   // Handle Mute/Unmute
   useEffect(() => {
     if (iframeRef.current && trailer) {
@@ -125,20 +168,35 @@ const MovieDetailsModal = ({ movie, onClose }) => {
   }, [isMuted, trailer]);
 
   const handleWatchNow = () => {
-    if (isSeries && selectedSeason?.episodes?.length > 0) {
-      // Para séries, assistir o primeiro episódio da temporada selecionada
-      const firstEpisode = selectedSeason.episodes[0];
-      navigate(`/watch/${movie.id}`, { 
-        state: { 
-          movie: {
-            ...movie,
-            videoUrl: firstEpisode.video_url,
-            episodeTitle: firstEpisode.title,
-            seasonNumber: selectedSeason.season_number,
-            episodeNumber: firstEpisode.episode_number
-          }
-        } 
-      });
+    if (isSeries) {
+      if (nextEpisode) {
+          // Continue watching
+          navigate(`/watch/${movie.id}`, { 
+            state: { 
+              movie: {
+                ...movie,
+                videoUrl: nextEpisode.video_url,
+                episodeTitle: nextEpisode.title,
+                seasonNumber: nextEpisode.seasonNumber,
+                episodeNumber: nextEpisode.episode_number
+              }
+            } 
+          });
+      } else if (selectedSeason?.episodes?.length > 0) {
+          // Play first episode of selected season (or default S1E1)
+          const firstEpisode = selectedSeason.episodes[0];
+          navigate(`/watch/${movie.id}`, { 
+            state: { 
+              movie: {
+                ...movie,
+                videoUrl: firstEpisode.video_url,
+                episodeTitle: firstEpisode.title,
+                seasonNumber: selectedSeason.season_number,
+                episodeNumber: firstEpisode.episode_number
+              }
+            } 
+          });
+      }
     } else {
       navigate(`/watch/${movie.id}`, { state: { movie } });
     }
@@ -362,7 +420,7 @@ const MovieDetailsModal = ({ movie, onClose }) => {
 
               {/* Meta Info */}
               <div className="netflix-meta">
-                {getRating() && <span className="netflix-rating">{getRating()} Match</span>}
+                {/* Match removed as requested */}
                 <span className="netflix-year">{getYear()}</span>
                 {getRuntime() && <span className="netflix-runtime">{getRuntime()}</span>}
                 <span className="netflix-hd">HD</span>
@@ -372,16 +430,36 @@ const MovieDetailsModal = ({ movie, onClose }) => {
               <div className="netflix-actions">
                 <button className="btn-primary netflix-btn-play" onClick={handleWatchNow}>
                   <Play size={24} fill="currentColor" />
-                  <span>{isSeries ? 'Assistir S01E01' : 'Assistir'}</span>
+                  <span>
+                     {isSeries 
+                        ? (nextEpisode 
+                            ? `Assistir S${nextEpisode.seasonNumber}E${nextEpisode.episode_number}` 
+                            : 'Assistir S01E01') 
+                        : 'Assistir'}
+                  </span>
                 </button>
                 
                 <button 
-                  className={`btn-secondary netflix-btn-list ${inList ? 'in-list' : ''}`}
+                  className={`netflix-btn-list ${inList ? 'in-list' : ''}`}
                   onClick={handleToggleList}
                   title={inList ? 'Remover da Lista' : 'Adicionar à Lista'}
-                  style={{ borderRadius: '50%', width: '52px', height: '52px', padding: '0', display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: '52px' }}
+                  style={{ 
+                    borderRadius: '50%', 
+                    width: '48px', 
+                    height: '48px', 
+                    padding: '0', 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center', 
+                    minWidth: '48px',
+                    flex: '0 0 48px',
+                    aspectRatio: '1',
+                    background: inList ? 'var(--success)' : 'transparent',
+                    border: '2px solid rgba(255, 255, 255, 0.5)',
+                    color: 'white'
+                  }}
                 >
-                  {inList ? <Check size={24} /> : <Plus size={24} />}
+                  {inList ? <Check size={20} /> : <Plus size={24} />}
                 </button>
               </div>
             </div>

@@ -7,3 +7,8 @@ dist/
 .vscode/
 .idea/
 .vercel
+__pycache__/
+*.pyc
+*.session
+*.session-journal
+backend/user_scraper_session.session

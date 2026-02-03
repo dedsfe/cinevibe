@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Film, Tv, Home } from 'lucide-react';
+import { Film, Tv, Home, Heart } from 'lucide-react';
 import { motion } from 'framer-motion';
 import '../styles/MobileToggle.css';
 
@@ -14,7 +14,7 @@ const MobileToggle = () => {
     
     return (
         <div className="mobile-toggle-container">
-            <div className="toggle-wrapper" style={{ width: '300px' }}>
+            <div className="toggle-wrapper">
                 <button 
                     className={`toggle-btn ${isHome ? 'active' : ''}`}
                     onClick={() => navigate('/home')}
@@ -75,6 +75,31 @@ const MobileToggle = () => {
                         <span>Séries</span>
                     </span>
                     {isSeries && (
+                        <motion.div 
+                            className="active-pill"
+                            layoutId="activePill"
+                            transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                            style={{
+                                position: 'absolute',
+                                inset: 4,
+                                background: 'rgba(255, 255, 255, 0.15)',
+                                borderRadius: '100px',
+                                border: '1px solid rgba(255, 255, 255, 0.1)',
+                                zIndex: 1
+                            }}
+                        />
+                    )}
+                </button>
+                <button 
+                    className={`toggle-btn ${location.pathname.includes('/mylist') ? 'active' : ''}`}
+                    onClick={() => navigate('/mylist')}
+                    style={{ position: 'relative' }}
+                >
+                    <span style={{ position: 'relative', zIndex: 2, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <Heart size={16} />
+                        <span>Lista</span>
+                    </span>
+                    {location.pathname.includes('/mylist') && (
                         <motion.div 
                             className="active-pill"
                             layoutId="activePill"

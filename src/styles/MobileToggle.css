@@ -14,11 +14,17 @@
     -webkit-backdrop-filter: blur(20px);
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 100px;
-    padding: 4px;
+    padding: 6px;
     display: flex;
     position: relative;
-    width: 240px;
+    width: max-content;
+    min-width: unset;
+    max-width: 98vw; /* Allow almost full width */
     box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+    /* Remove scroll unless absolutely necessary */
+    overflow-x: auto; 
+    scrollbar-width: none;
+    justify-content: center; /* Center buttons if they wrap or fit */
 }
 
 .toggle-btn {
@@ -26,7 +32,7 @@
     background: transparent;
     border: none;
     color: rgba(255, 255, 255, 0.6);
-    padding: 8px 0;
+    padding: 10px 12px; /* Slightly reduced horizontal padding to fit all */
     font-size: 0.9rem;
     font-weight: 600;
     cursor: pointer;
@@ -37,7 +43,8 @@
     z-index: 2;
     transition: color 0.3s ease;
     border-radius: 100px;
-    outline: none; /* Remove focus outline */
+    outline: none;
+    white-space: nowrap; /* Prevent wrapping */
 }
 
 .toggle-btn.active {

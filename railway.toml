@@ -8,6 +8,6 @@ providers = ["python"]
 [deploy]
 startCommand = "cd backend && gunicorn app:app --bind 0.0.0.0:$PORT --workers 2 --threads 2"
 healthcheckPath = "/api/health"
-healthcheckTimeout = 60
+healthcheckTimeout = 300
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 10

@@ -38,8 +38,11 @@ from database import (
     get_my_list_series,
     is_in_my_list_movies,
     is_in_my_list_series,
+    search_movies_locally,
+    search_series_locally,
 )
 from scraper import scrape_for_title
+from playwright_scraper import scrape_operatopzera
 from validator import validate_embed
 from bulk_scrape_tmdb import run_bulk_scrape, get_scraper_state
 
@@ -194,6 +197,27 @@ def get_catalog():
     return jsonify({"results": movies})
 
 
+@app.route("/api/movies/search", methods=["GET"])
+def search_movies():
+    """Search movies in local database."""
+    query = request.args.get("q", "").strip()
+    limit = int(request.args.get("limit", 50))
+    
+    if not query:
+        return jsonify({"results": []})
+        
+    movies = search_movies_locally(query, limit)
+    series = search_series_locally(query, limit)
+    
+    # Combined results
+    results = movies + series
+    
+    # Sort combined by exact match first if needed, or by title
+    results.sort(key=lambda x: (0 if query.lower() in x['title'].lower() else 1, x['title']))
+    
+    return jsonify({"results": results[:limit]})
+
+
 @app.route("/api/get-embed", methods=["POST"])
 def get_embed():
     data = request.get_json(force=True) or {}
@@ -217,13 +241,24 @@ def get_embed():
             return jsonify({"embedUrl": cached, "cached": True})
         # if cache exists but invalid, continue to scrape
 
-    # 3) On-demand scrape from legal sources
+    # 3) On-demand scrape from legal sources (Fast)
     embed = scrape_for_title(title, tmdb_id, year=year)
     if embed and validate_embed(embed):
         save_embed(title, embed, tmdb_id)
         return jsonify({"embedUrl": embed, "cached": False})
 
-    return jsonify({"error": "Embed não encontrado"}), 404
+    # 4) Deep Scrape (Slow, but finds everything - e.g. Barbie)
+    logging.info(f"Fast scrape failed for {title}. Attempting deep scrape...")
+    try:
+        deep_embed = scrape_operatopzera(title, year=year)
+        if deep_embed:
+             # Validate merely to be safe, though scraper checks video tag
+             save_embed(title, deep_embed, tmdb_id)
+             return jsonify({"embedUrl": deep_embed, "cached": False})
+    except Exception as e:
+        logging.error(f"Deep scrape failed: {e}")
+
+    return jsonify({"error": "Embed não encontrado. Tente novamente em alguns instantes."}), 404
 
 
 @app.route("/api/proxy-video", methods=["GET"])

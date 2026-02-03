@@ -34,10 +34,16 @@ def init_db():
                 poster_path TEXT,
                 backdrop_path TEXT,
                 overview TEXT,
+                year TEXT,
                 repair_attempts INTEGER DEFAULT 0,
                 last_repair_date DATETIME
             )"""
         )
+        # Migration: Add year column if doesn't exist
+        try:
+            c.execute("ALTER TABLE links ADD COLUMN year TEXT")
+        except sqlite3.OperationalError:
+            pass # Column already exists
         c.execute(
             """CREATE TABLE IF NOT EXISTS catalog_raw (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -73,10 +79,11 @@ def save_embed(
     title: str,
     embed_url: str,
     tmdb_id: Optional[str] = None,
-    poster_path: str = None,
-    backdrop_path: str = None,
-    overview: str = None,
-    original_raw_title: str = None,
+    poster_path: Optional[str] = None,
+    backdrop_path: Optional[str] = None,
+    overview: Optional[str] = None,
+    original_raw_title: Optional[str] = None,
+    year: Optional[str] = None,
 ):
     with get_conn() as conn:
         c = conn.cursor()
@@ -89,34 +96,30 @@ def save_embed(
         existing = c.fetchone()
 
         if existing:
-            tmdb_id = tmdb_id or existing[0]
-            poster_path = poster_path or existing[1]
-            backdrop_path = backdrop_path or existing[2]
-            overview = overview or existing[3]
-            original_raw_title = original_raw_title or existing[4]
-
             c.execute(
-                """UPDATE links SET 
-                   tmdb_id = ?, embed_url = ?, added_at = ?, 
-                   poster_path = ?, backdrop_path = ?, overview = ?, 
-                   original_raw_title = ?
+                """UPDATE links 
+                   SET embed_url = ?, added_at = ?, tmdb_id = COALESCE(?, tmdb_id), 
+                       poster_path = COALESCE(?, poster_path), backdrop_path = COALESCE(?, backdrop_path), 
+                       overview = COALESCE(?, overview), original_raw_title = COALESCE(?, original_raw_title),
+                       year = COALESCE(?, year)
                    WHERE title = ?""",
                 (
-                    tmdb_id,
                     embed_url,
                     datetime.utcnow(),
+                    tmdb_id,
                     poster_path,
                     backdrop_path,
                     overview,
                     original_raw_title,
+                    year,
                     title,
                 ),
             )
         else:
             c.execute(
                 """INSERT INTO links 
-                   (tmdb_id, title, embed_url, added_at, poster_path, backdrop_path, overview, original_raw_title) 
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                   (tmdb_id, title, embed_url, added_at, poster_path, backdrop_path, overview, original_raw_title, year) 
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     tmdb_id,
                     title,
@@ -126,6 +129,7 @@ def save_embed(
                     backdrop_path,
                     overview,
                     original_raw_title,
+                    year,
                 ),
             )
         conn.commit()
@@ -259,9 +263,50 @@ def search_movies_locally(query: str, limit=50):
                     "poster_path": row["poster_path"],
                     "backdrop_path": row["backdrop_path"],
                     "overview": row["overview"],
-                    "release_date": row["year"] or "", # Use year column as fallback
+                    "release_date": row["year"] or "", 
                     "isAvailable": True,  # By definition, these are available
                     "embedUrl": row["embed_url"],
+                }
+            )
+        return results
+
+
+def search_series_locally(query: str, limit=50):
+    """Search for series in the local database."""
+    if not query:
+        return []
+
+    with get_conn() as conn:
+        conn.row_factory = sqlite3.Row
+        c = conn.cursor()
+        c.execute(
+            """
+            SELECT id, title, overview, poster_path, backdrop_path, tmdb_id, year, rating
+            FROM series
+            WHERE title LIKE ?
+              AND EXISTS (SELECT 1 FROM episodes e WHERE e.series_id = series.id LIMIT 1)
+            ORDER BY 
+              CASE WHEN title LIKE ? THEN 1 ELSE 2 END,
+              created_at DESC
+            LIMIT ?
+        """,
+            (f"%{query}%", f"{query}%", limit),
+        )
+        rows = c.fetchall()
+
+        results = []
+        for row in rows:
+            results.append(
+                {
+                    "id": row["tmdb_id"] or row["id"],
+                    "title": row["title"],
+                    "poster_path": row["poster_path"],
+                    "backdrop_path": row["backdrop_path"],
+                    "overview": row["overview"],
+                    "release_date": str(row["year"]) if row["year"] else "",
+                    "media_type": "tv",
+                    "vote_average": row["rating"],
+                    "isAvailable": True,
                 }
             )
         return results
