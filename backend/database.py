@@ -225,6 +225,48 @@ def get_catalog_movies(limit=100, offset=0):
         return movies
 
 
+def search_movies_locally(query: str, limit=50):
+    """Search for movies in the local database."""
+    if not query:
+        return []
+
+    with get_conn() as conn:
+        conn.row_factory = sqlite3.Row
+        c = conn.cursor()
+        # Search by title, ensuring we only get items with valid embeds
+        c.execute(
+            """
+            SELECT tmdb_id, title, embed_url, poster_path, backdrop_path, overview, year, added_at
+            FROM links
+            WHERE title LIKE ? 
+              AND embed_url IS NOT NULL 
+              AND embed_url != 'NOT_FOUND'
+            ORDER BY 
+              CASE WHEN title LIKE ? THEN 1 ELSE 2 END, -- Exact start match priority
+              added_at DESC
+            LIMIT ?
+        """,
+            (f"%{query}%", f"{query}%", limit),
+        )
+        rows = c.fetchall()
+
+        results = []
+        for row in rows:
+            results.append(
+                {
+                    "id": row["tmdb_id"],  # Keep as string/mixed
+                    "title": row["title"],
+                    "poster_path": row["poster_path"],
+                    "backdrop_path": row["backdrop_path"],
+                    "overview": row["overview"],
+                    "release_date": row["year"] or "", # Use year column as fallback
+                    "isAvailable": True,  # By definition, these are available
+                    "embedUrl": row["embed_url"],
+                }
+            )
+        return results
+
+
 # ==================== SERIES FUNCTIONS ====================
 
 def get_catalog_series(limit=100, offset=0):
