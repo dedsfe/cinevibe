@@ -122,6 +122,20 @@ def create_default_admin():
 create_default_admin()
 
 
+@app.route("/", methods=["GET"])
+def root():
+    """Root endpoint for health checks."""
+    return jsonify({
+        "status": "ok",
+        "message": "Filfil API is running",
+        "endpoints": {
+            "health": "/api/health",
+            "catalog": "/api/catalog",
+            "series": "/api/series"
+        }
+    })
+
+
 @app.route("/api/health", methods=["GET"])
 def health():
     try:
