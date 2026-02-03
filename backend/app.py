@@ -80,31 +80,23 @@ CORS(app, resources={
     r"/*": {
         "origins": "*",
         "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-        "allow_headers": ["Content-Type", "Authorization"],
+        "allow_headers": ["Content-Type", "Authorization", "Accept"],
         "supports_credentials": False
     }
 })
 
-@app.before_request
-def handle_preflight():
-    if request.method == "OPTIONS":
-        response = app.make_response(("", 204))
-        origin = request.headers.get("Origin", "*")
-        response.headers.add("Access-Control-Allow-Origin", origin)
-        response.headers.add("Access-Control-Allow-Headers", "Content-Type, Authorization, Accept")
-        response.headers.add("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-        response.headers.add("Vary", "Origin")
-        return response
-
-@app.after_request
-def add_cors_headers(response):
-    origin = request.headers.get("Origin")
-    if origin:
-        response.headers.add("Access-Control-Allow-Origin", origin)
-    else:
-        response.headers.add("Access-Control-Allow-Origin", "*")
-    response.headers.add("Access-Control-Allow-Headers", "Content-Type, Authorization, Accept")
-    response.headers.add("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+# Handle OPTIONS preflight manually to ensure 204 response
+@app.route('/api/auth/login', methods=['OPTIONS'])
+@app.route('/api/auth/register', methods=['OPTIONS'])
+@app.route('/api/auth/me', methods=['OPTIONS'])
+def handle_options():
+    response = app.make_response('')
+    response.status_code = 204
+    origin = request.headers.get('Origin', '*')
+    response.headers['Access-Control-Allow-Origin'] = origin
+    response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, Accept'
+    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
+    response.headers['Vary'] = 'Origin'
     return response
 
 # Initialize database on startup
