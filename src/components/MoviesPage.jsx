@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { API_BASE_URL } from '../config';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CheckCircle, Clock, AlertTriangle, Youtube, Filter } from 'lucide-react';
+import { CheckCircle, Clock, AlertTriangle, Youtube, Filter, Server, ArrowRight } from 'lucide-react';
 import Navbar from './Navbar';
 import SearchModal from './SearchModal';
 import MovieCard from './MovieCard';
@@ -14,6 +14,7 @@ const MoviesPage = () => {
     const [movies, setMovies] = useState([]);
     const [filteredMovies, setFilteredMovies] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
     const [isSearchOpen, setIsSearchOpen] = useState(false);
     const [filter, setFilter] = useState('all');
     const [selectedMovie, setSelectedMovie] = useState(null);
@@ -23,7 +24,10 @@ const MoviesPage = () => {
     useEffect(() => {
         const fetchCatalog = async (isBackground = false) => {
             try {
-                if (!isBackground) setLoading(true);
+                if (!isBackground) {
+                    setLoading(true);
+                    setError(null);
+                }
                 const response = await fetch(`${API_BASE_URL}/catalog?limit=1000`);
                 if (response.ok) {
                     const data = await response.json();
@@ -41,9 +45,14 @@ const MoviesPage = () => {
                     
                     setMovies(allMovies);
                     applyFilter(allMovies, filter);
+                } else {
+                    throw new Error(`HTTP ${response.status}`);
                 }
             } catch (error) {
                 console.error("Failed to fetch catalog", error);
+                if (!isBackground) {
+                    setError("Backend offline");
+                }
             } finally {
                 if (!isBackground) setLoading(false);
             }
@@ -171,8 +180,44 @@ const MoviesPage = () => {
                 )}
                 
                 {!loading && movies.length === 0 && (
-                     <div className="row-empty">
-                        Nenhum filme encontrado no catálogo.
+                     <div className="row-empty" style={{ 
+                         padding: '60px 20px', 
+                         textAlign: 'center',
+                         maxWidth: '600px',
+                         margin: '0 auto'
+                     }}>
+                        {error ? (
+                            <>
+                                <Server size={48} style={{ opacity: 0.5, marginBottom: '16px', color: '#e50914' }} />
+                                <h3 style={{ marginBottom: '12px' }}>Servidor Offline</h3>
+                                <p style={{ color: 'var(--text-muted)', marginBottom: '24px', lineHeight: '1.6' }}>
+                                    O backend não está respondendo.<br/>
+                                    Para ver os filmes, rode o servidor localmente:
+                                </p>
+                                <div style={{ 
+                                    background: 'rgba(255,255,255,0.05)', 
+                                    padding: '20px', 
+                                    borderRadius: '8px',
+                                    textAlign: 'left',
+                                    marginBottom: '24px',
+                                    fontFamily: 'monospace',
+                                    fontSize: '0.9rem'
+                                }}>
+                                    <p style={{ margin: '0 0 8px 0', color: '#888' }}># No Windows:</p>
+                                    <p style={{ margin: '0 0 16px 0' }}>start-local.bat</p>
+                                    <p style={{ margin: '0 0 8px 0', color: '#888' }}># No Mac/Linux:</p>
+                                    <p style={{ margin: 0 }}>./start-local.sh</p>
+                                </div>
+                                <p style={{ fontSize: '0.85rem', color: '#666' }}>
+                                    Ou veja o arquivo <code>SETUP_LOCAL.md</code> para instruções completas.
+                                </p>
+                            </>
+                        ) : (
+                            <>
+                                <AlertTriangle size={48} style={{ opacity: 0.3, marginBottom: '16px' }} />
+                                Nenhum filme encontrado no catálogo.
+                            </>
+                        )}
                      </div>
                 )}
             </div>
