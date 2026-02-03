@@ -390,7 +390,7 @@ const WatchModal = ({ movie, onClose }) => {
     setError(null);
     
     try {
-        const response = await fetch('http://127.0.0.1:3000/api/get-embed', {
+        const response = await fetch('http://127.0.0.1:8080/api/get-embed', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -604,16 +604,18 @@ const LazyMovieRow = ({ title, fetchEndpoint, onMovieClick }) => {
     setIsLoading(true);
     try {
       const data = await fetchData(fetchEndpoint);
+      console.log(`[LazyMovieRow: ${title}] Data received:`, data?.results?.length || 0, 'movies');
       if (data?.results) {
         const validMovies = data.results
           .filter(movie => movie.poster_path)
           .slice(0, 100);
+        console.log(`[LazyMovieRow: ${title}] After poster filter:`, validMovies.length, 'movies');
         
         // Batch check availability
         const tmdbIds = validMovies.map(m => m.id);
         if (tmdbIds.length > 0) {
             try {
-                const checkRes = await fetch('http://127.0.0.1:3000/api/cache/check-batch', {
+                const checkRes = await fetch('http://127.0.0.1:8080/api/cache/check-batch', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ tmdbIds })
@@ -630,6 +632,7 @@ const LazyMovieRow = ({ title, fetchEndpoint, onMovieClick }) => {
 
                     // Filter only available ones
                     const filteredMovies = validMovies.filter(m => m.isAvailable);
+                    console.log(`[LazyMovieRow: ${title}] After availability filter:`, filteredMovies.length, 'movies');
                     setMovies(filteredMovies);
                 } else {
                     // Fallback: if check fails, show all to avoid total empty (optional, but safer for TMDB rows)
@@ -970,17 +973,6 @@ const HomePage = () => {
       />
       
       <div className="content-container">
-        <LazyMovieRow 
-          title="CATÁLOGO ORIGINAL" 
-          fetchEndpoint="/api/catalog?limit=100"
-          onMovieClick={handleMovieClick}
-        />
-
-        <LazyMovieRow 
-          title="EM ALTA" 
-          fetchEndpoint="/api/catalog?limit=100&sort=trending"
-          onMovieClick={handleMovieClick}
-        />
         {myList.length > 0 && (
           <section className="movie-row">
             <h2 className="row-title">Minha Lista</h2>
@@ -998,6 +990,12 @@ const HomePage = () => {
             </div>
           </section>
         )}
+        
+        <LazyMovieRow 
+          title="CATÁLOGO ORIGINAL" 
+          fetchEndpoint="/api/catalog?limit=100"
+          onMovieClick={handleMovieClick}
+        />
         <LazyMovieRow title="EM ALTA (MUNDIAL)" fetchEndpoint="/trending/all/day" onMovieClick={handleMovieClick} />
         <LazyMovieRow title="AÇÃO & AVENTURA" fetchEndpoint={fetchCategories.action} onMovieClick={handleMovieClick} />
         <LazyMovieRow title="COMÉDIA" fetchEndpoint={fetchCategories.comedy} onMovieClick={handleMovieClick} />
@@ -1026,7 +1024,7 @@ const HomePage = () => {
       
       <footer className="footer">
         <div className="footer-content">
-          <p>© 2024 CineVibe. Todos os direitos reservados.</p>
+          <p>© 2024 Filfil. Todos os direitos reservados.</p>
           <p>Powered by TMDB</p>
         </div>
       </footer>

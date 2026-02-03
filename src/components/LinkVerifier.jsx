@@ -25,7 +25,7 @@ const LinkVerifier = () => {
 
   const fetchMovies = async () => {
     try {
-      const response = await fetch('http://127.0.0.1:3000/api/catalog?limit=1000');
+      const response = await fetch('http://127.0.0.1:8080/api/catalog?limit=1000');
       const data = await response.json();
       if (data.results) {
         // Only show movies with links (not NOT_FOUND)
@@ -45,7 +45,7 @@ const LinkVerifier = () => {
     setVerifyResult(null);
 
     try {
-      const response = await fetch('http://127.0.0.1:3000/api/verify-link', {
+      const response = await fetch('http://127.0.0.1:8080/api/verify-link', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -68,7 +68,7 @@ const LinkVerifier = () => {
 
     setFixing(true);
     try {
-      const response = await fetch('http://127.0.0.1:3000/api/fix-link', {
+      const response = await fetch('http://127.0.0.1:8080/api/fix-link', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

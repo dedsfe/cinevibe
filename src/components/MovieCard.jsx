@@ -1,13 +1,21 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Star, CheckCircle, Clock, Youtube } from 'lucide-react';
+import { Star, CheckCircle, Clock, Youtube, Tv } from 'lucide-react';
 import { getPosterUrl } from '../hooks/useTMDB';
 
 const MovieCard = ({ movie, index, onClick, isAvailable }) => {
   const [isHovered, setIsHovered] = useState(false);
   
+  // Detectar se é série da nossa API (tem opera_id)
+  const isLocalSeries = movie.opera_id || movie.isLocalSeries;
+  
   // Detectar tipo de link
   const getLinkStatus = () => {
+    // Se for série da nossa API, sempre está disponível
+    if (isLocalSeries) {
+      return { type: 'series', icon: <Tv size={14} />, label: 'Série', color: '#e50914' };
+    }
+    
     const embedUrl = movie.embedUrl || movie.embed_url;
     
     if (!embedUrl || embedUrl === 'NOT_FOUND') {
@@ -27,6 +35,19 @@ const MovieCard = ({ movie, index, onClick, isAvailable }) => {
   
   const linkStatus = getLinkStatus();
   
+  // Obter URL do poster (séries da API já vêm com URL completa)
+  const getPosterImage = () => {
+    if (movie.poster_path && movie.poster_path.startsWith('http')) {
+      return movie.poster_path;
+    }
+    return getPosterUrl(movie.poster_path);
+  };
+  
+  // Obter rating (TMDB usa vote_average, nossa API usa rating)
+  const getRating = () => {
+    return movie.vote_average || movie.rating || 0;
+  };
+  
   return (
     <motion.div
       className="movie-card"
@@ -39,43 +60,13 @@ const MovieCard = ({ movie, index, onClick, isAvailable }) => {
     >
       <div className="movie-card-inner">
         <img 
-          src={getPosterUrl(movie.poster_path)} 
+          src={getPosterImage()} 
           alt={movie.title || movie.name}
           className="movie-poster"
           loading="lazy"
         />
         
-        <AnimatePresence>
-          {isHovered && (
-            <motion.div 
-              className="movie-card-overlay"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 10 }}
-              transition={{ duration: 0.3 }}
-            >
-              <div className="movie-card-info">
-                <h4 className="movie-title">{movie.title || movie.name}</h4>
-                
-                <div className="card-status-row">
-                  <div 
-                    className={`mini-status ${linkStatus.type}`}
-                    style={{ color: linkStatus.color }}
-                  >
-                    {linkStatus.icon}
-                    <span>{linkStatus.label === 'Disponível' ? 'HD' : linkStatus.label}</span>
-                  </div>
-                  
-                  <div className="movie-rating">
-                    <Star size={12} fill="#ffd700" color="#ffd700" />
-                    <span>{movie.vote_average?.toFixed(1)}</span>
-                  </div>
-                </div>
-
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+        {/* Hover clean - sem overlay */}
       </div>
     </motion.div>
   );

@@ -3,11 +3,16 @@ from flask_cors import CORS
 import logging
 import os
 import threading
-from datetime import datetime
+from datetime import datetime, timedelta
+from functools import wraps
+
+# Password hashing
+from werkzeug.security import generate_password_hash, check_password_hash
 
 # Local modules (to be created below in this patch)
 from database import (
     init_db,
+    init_users_table,
     get_cached_embed,
     get_cached_embed_by_id,
     save_embed,
@@ -15,16 +20,98 @@ from database import (
     get_cached_ids,
     get_cached_statuses,
     get_catalog_movies,
+    get_catalog_series,
+    get_series_seasons,
+    get_season_episodes,
+    get_series_by_id,
+    get_series_count,
+    create_user,
+    get_user_by_username,
+    update_last_login,
+    get_all_users,
+    delete_user,
+    add_to_my_list_movies,
+    remove_from_my_list_movies,
+    get_my_list_movies,
+    add_to_my_list_series,
+    remove_from_my_list_series,
+    get_my_list_series,
+    is_in_my_list_movies,
+    is_in_my_list_series,
 )
 from scraper import scrape_for_title
 from validator import validate_embed
 from bulk_scrape_tmdb import run_bulk_scrape, get_scraper_state
 
+# Simple token storage (in production use JWT or sessions)
+# Format: {token: {user_id, expires}}
+active_tokens = {}
+
+def generate_token(user_id):
+    """Generate a simple token for user session."""
+    import secrets
+    token = secrets.token_urlsafe(32)
+    expires = datetime.utcnow() + timedelta(days=7)  # 7 days
+    active_tokens[token] = {"user_id": user_id, "expires": expires}
+    return token
+
+def verify_token(token):
+    """Verify if token is valid and return user_id."""
+    if not token or token not in active_tokens:
+        return None
+    session = active_tokens[token]
+    if datetime.utcnow() > session["expires"]:
+        del active_tokens[token]
+        return None
+    return session["user_id"]
+
+def require_auth(f):
+    """Decorator to require authentication."""
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        auth_header = request.headers.get('Authorization', '')
+        if not auth_header.startswith('Bearer '):
+            return jsonify({"error": "Token de autenticação necessário"}), 401
+        token = auth_header.split(' ')[1]
+        user_id = verify_token(token)
+        if not user_id:
+            return jsonify({"error": "Token inválido ou expirado"}), 401
+        return f(user_id, *args, **kwargs)
+    return decorated
+
 app = Flask(__name__)
-CORS(app)
+# Enable CORS for all domains on all routes
+CORS(app, resources={
+    r"/*": {
+        "origins": "*",
+        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        "allow_headers": "*",
+        "supports_credentials": True
+    }
+})
+
+# Add CORS headers to all responses
+@app.after_request
+def after_request(response):
+    response.headers.add('Access-Control-Allow-Origin', '*')
+    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+    response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
+    return response
 
 # Initialize database on startup
 init_db()
+init_users_table()
+
+# Create default admin user if no users exist
+def create_default_admin():
+    users = get_all_users()
+    if not users:
+        password_hash = generate_password_hash("admin123")
+        create_user("admin", password_hash, "Administrador", is_admin=True)
+        print("✅ Usuário admin criado: admin / admin123")
+        print("   ⚠️  Por segurança, altere a senha após o primeiro login!")
+
+create_default_admin()
 
 
 @app.route("/api/health", methods=["GET"])
@@ -256,11 +343,275 @@ def integrity_stats():
     )
 
 
+# ==================== SERIES ENDPOINTS ====================
+
+@app.route("/api/series", methods=["GET"])
+def get_series():
+    """Get catalog of series with pagination."""
+    limit = int(request.args.get("limit", 50))
+    offset = int(request.args.get("offset", 0))
+    series = get_catalog_series(limit, offset)
+    total = get_series_count()
+    return jsonify({"results": series, "total": total, "limit": limit, "offset": offset})
+
+
+@app.route("/api/series/<int:series_id>", methods=["GET"])
+def get_series_detail(series_id):
+    """Get single series details with all seasons and episodes."""
+    series = get_series_by_id(series_id)
+    if not series:
+        return jsonify({"error": "Série não encontrada"}), 404
+    
+    seasons = get_series_seasons(series_id)
+    # Get episodes for each season
+    for season in seasons:
+        season["episodes"] = get_season_episodes(season["id"])
+    
+    series["seasons"] = seasons
+    return jsonify(series)
+
+
+@app.route("/api/series/<int:series_id>/seasons", methods=["GET"])
+def get_series_seasons_endpoint(series_id):
+    """Get all seasons for a series."""
+    series = get_series_by_id(series_id)
+    if not series:
+        return jsonify({"error": "Série não encontrada"}), 404
+    
+    seasons = get_series_seasons(series_id)
+    return jsonify({"series_id": series_id, "seasons": seasons})
+
+
+@app.route("/api/series/seasons/<int:season_id>/episodes", methods=["GET"])
+def get_season_episodes_endpoint(season_id):
+    """Get all episodes for a season."""
+    episodes = get_season_episodes(season_id)
+    return jsonify({"season_id": season_id, "episodes": episodes})
+
+
+@app.route("/api/series/search", methods=["GET"])
+def search_series():
+    """Search series by title (only series with at least 1 episode)."""
+    query = request.args.get("q", "").strip()
+    if not query:
+        return jsonify({"results": []})
+    
+    from database import get_conn
+    conn = get_conn()
+    c = conn.cursor()
+    c.execute(
+        """
+        SELECT s.id, s.opera_id, s.tmdb_id, s.title, s.overview, s.poster_path, 
+               s.backdrop_path, s.year, s.genres, s.rating
+        FROM series s
+        WHERE s.title LIKE ? AND s.status = 'active'
+          AND EXISTS (
+              SELECT 1 FROM episodes e 
+              WHERE e.series_id = s.id 
+              LIMIT 1
+          )
+        ORDER BY s.title
+        LIMIT 50
+    """,
+        (f"%{query}%",),
+    )
+    rows = c.fetchall()
+    conn.close()
+    
+    results = []
+    for row in rows:
+        results.append(
+            {
+                "id": row["id"],
+                "title": row["title"],
+                "poster_path": row["poster_path"],
+                "backdrop_path": row["backdrop_path"],
+                "overview": row["overview"],
+                "year": row["year"],
+                "genres": row["genres"],
+                "rating": row["rating"],
+            }
+        )
+    return jsonify({"results": results})
+
+
+# ==================== AUTH ENDPOINTS ====================
+
+@app.route("/api/auth/register", methods=["POST"])
+def register():
+    """Register a new user."""
+    data = request.get_json()
+    username = data.get("username", "").strip()
+    password = data.get("password", "").strip()
+    name = data.get("name", "").strip()
+    
+    if not username or not password:
+        return jsonify({"error": "Usuário e senha são obrigatórios"}), 400
+    
+    if len(password) < 4:
+        return jsonify({"error": "Senha deve ter pelo menos 4 caracteres"}), 400
+    
+    # Hash password
+    password_hash = generate_password_hash(password)
+    
+    # Create user
+    user_id = create_user(username, password_hash, name)
+    if not user_id:
+        return jsonify({"error": "Usuário já existe"}), 409
+    
+    return jsonify({"message": "Usuário criado com sucesso", "user_id": user_id}), 201
+
+
+@app.route("/api/auth/login", methods=["POST"])
+def login():
+    """Login user and return token."""
+    data = request.get_json()
+    username = data.get("username", "").strip()
+    password = data.get("password", "").strip()
+    
+    if not username or not password:
+        return jsonify({"error": "Usuário e senha são obrigatórios"}), 400
+    
+    # Get user
+    user = get_user_by_username(username)
+    if not user:
+        return jsonify({"error": "Usuário ou senha incorretos"}), 401
+    
+    # Check password
+    if not check_password_hash(user["password_hash"], password):
+        return jsonify({"error": "Usuário ou senha incorretos"}), 401
+    
+    # Update last login
+    update_last_login(user["id"])
+    
+    # Generate token
+    token = generate_token(user["id"])
+    
+    return jsonify({
+        "message": "Login realizado com sucesso",
+        "token": token,
+        "user": {
+            "id": user["id"],
+            "username": user["username"],
+            "name": user["name"],
+            "is_admin": user["is_admin"]
+        }
+    })
+
+
+@app.route("/api/auth/me", methods=["GET"])
+@require_auth
+def get_current_user(user_id):
+    """Get current user info."""
+    from database import get_conn
+    conn = get_conn()
+    c = conn.cursor()
+    c.execute("SELECT id, username, name, is_admin FROM users WHERE id = ?", (user_id,))
+    row = c.fetchone()
+    conn.close()
+    
+    if not row:
+        return jsonify({"error": "Usuário não encontrado"}), 404
+    
+    return jsonify({
+        "id": row["id"],
+        "username": row["username"],
+        "name": row["name"],
+        "is_admin": bool(row["is_admin"])
+    })
+
+
+# ==================== PROTECTED MY LIST ENDPOINTS ====================
+
+@app.route("/api/mylist/movies", methods=["GET"])
+@require_auth
+def get_user_movie_list(user_id):
+    """Get user's movie list."""
+    movies = get_my_list_movies(user_id)
+    return jsonify({"results": movies, "count": len(movies)})
+
+
+@app.route("/api/mylist/movies", methods=["POST"])
+@require_auth
+def add_movie_to_list(user_id):
+    """Add movie to user's list."""
+    data = request.get_json()
+    success = add_to_my_list_movies(user_id, data)
+    if success:
+        return jsonify({"message": "Filme adicionado à lista"}), 201
+    return jsonify({"error": "Filme já está na lista"}), 409
+
+
+@app.route("/api/mylist/movies/<movie_id>", methods=["DELETE"])
+@require_auth
+def remove_movie_from_list(user_id, movie_id):
+    """Remove movie from user's list."""
+    success = remove_from_my_list_movies(user_id, movie_id)
+    if success:
+        return jsonify({"message": "Filme removido da lista"})
+    return jsonify({"error": "Filme não encontrado na lista"}), 404
+
+
+@app.route("/api/mylist/movies/<movie_id>/check", methods=["GET"])
+@require_auth
+def check_movie_in_list(user_id, movie_id):
+    """Check if movie is in user's list."""
+    is_in_list = is_in_my_list_movies(user_id, movie_id)
+    return jsonify({"in_list": is_in_list})
+
+
+@app.route("/api/mylist/series", methods=["GET"])
+@require_auth
+def get_user_series_list(user_id):
+    """Get user's series list."""
+    series = get_my_list_series(user_id)
+    return jsonify({"results": series, "count": len(series)})
+
+
+@app.route("/api/mylist/series", methods=["POST"])
+@require_auth
+def add_series_to_list(user_id):
+    """Add series to user's list."""
+    data = request.get_json()
+    series_id = data.get("series_id")
+    if not series_id:
+        return jsonify({"error": "ID da série é obrigatório"}), 400
+    
+    success = add_to_my_list_series(user_id, series_id)
+    if success:
+        return jsonify({"message": "Série adicionada à lista"}), 201
+    return jsonify({"error": "Série já está na lista"}), 409
+
+
+@app.route("/api/mylist/series/<int:series_id>", methods=["DELETE"])
+@require_auth
+def remove_series_from_list(user_id, series_id):
+    """Remove series from user's list."""
+    success = remove_from_my_list_series(user_id, series_id)
+    if success:
+        return jsonify({"message": "Série removida da lista"})
+    return jsonify({"error": "Série não encontrada na lista"}), 404
+
+
+@app.route("/api/mylist/series/<int:series_id>/check", methods=["GET"])
+@require_auth
+def check_series_in_list(user_id, series_id):
+    """Check if series is in user's list."""
+    is_in_list = is_in_my_list_series(user_id, series_id)
+    return jsonify({"in_list": is_in_list})
+
+
 if __name__ == "__main__":
     # Start auto-precache in background (daemon thread so it doesn't block exit)
     logging.info("Starting background auto-precache task...")
     threading.Thread(target=run_bulk_scrape, daemon=True).start()
 
-    # Run locally on 127.0.0.1:5000 (or from PORT env var)
-    port = int(os.environ.get("PORT", 5000))
+    # Run locally on 127.0.0.1:8080 (or from PORT env var)
+    # Port 5000 is used by macOS AirPlay, so we use 8080
+    port = int(os.environ.get("PORT", 8080))
+    print(f"\n🚀 Flask server starting on http://127.0.0.1:{port}/")
+    print(f"   API endpoints available:")
+    print(f"   - http://127.0.0.1:{port}/api/health")
+    print(f"   - http://127.0.0.1:{port}/api/catalog")
+    print(f"   - http://127.0.0.1:{port}/api/series\n")
     app.run(host="127.0.0.1", port=port, debug=True)

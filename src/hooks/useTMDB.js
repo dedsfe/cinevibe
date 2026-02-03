@@ -13,7 +13,7 @@ export const useTMDB = () => {
     setError(null);
     try {
       const isLocal = endpoint.startsWith('/api');
-      const baseUrl = isLocal ? 'http://127.0.0.1:3000' : BASE_URL;
+      const baseUrl = isLocal ? 'http://127.0.0.1:8080' : BASE_URL;
       const separator = endpoint.includes('?') ? '&' : '?';
       const url = isLocal 
         ? `${baseUrl}${endpoint}`

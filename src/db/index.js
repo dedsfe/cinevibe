@@ -1,5 +1,5 @@
-// IndexedDB Database for CineVibe
-const DB_NAME = 'CineVibeDB';
+// IndexedDB Database for Filfil
+const DB_NAME = 'FilfilDB';
 const DB_VERSION = 4; // Incremented to force upgrade
 
 // Initialize IndexedDB
@@ -53,7 +53,7 @@ export const addToMyList = async (movie) => {
     const request = store.put(item);
     request.onsuccess = () => {
       // Trigger background scrape
-      fetch('http://127.0.0.1:3000/api/scrape-background', {
+      fetch('http://127.0.0.1:8080/api/scrape-background', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

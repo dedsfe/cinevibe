@@ -1,8 +1,8 @@
-# CineVibe - Streaming Interface
+# Filfil - Streaming Interface
 
 Uma interface de streaming inspirada na Netflix/Disney+ com integração à API do TMDB.
 
-![CineVibe Screenshot](screenshot.png)
+![Filfil Screenshot](screenshot.png)
 
 ## Funcionalidades
 
@@ -29,8 +29,8 @@ Uma interface de streaming inspirada na Netflix/Disney+ com integração à API 
 
 ### 1. Clone o repositório
 ```bash
-git clone https://github.com/seu-usuario/cinevibe.git
-cd cinevibe
+git clone https://github.com/seu-usuario/filfil.git
+cd filfil
 ```
 
 ### 2. Instale as dependências
@@ -100,4 +100,4 @@ Sinta-se à vontade para abrir issues e pull requests!
 
 ## Licença
 
-MIT © 2024 CineVibe
+MIT © 2024 Filfil

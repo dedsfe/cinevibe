@@ -29,7 +29,7 @@ const AdminPage = () => {
     setLoading(true);
     try {
       // Fetch catalog from backend
-      const response = await fetch('http://127.0.0.1:3000/api/catalog?limit=1000');
+      const response = await fetch('http://127.0.0.1:8080/api/catalog?limit=1000');
       const data = await response.json();
       
       if (data.results) {

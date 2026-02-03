@@ -1,0 +1,17 @@
+{
+  "version": 2,
+  "name": "filfil-frontend",
+  "framework": "vite",
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "installCommand": "npm install",
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ],
+  "env": {
+    "VITE_API_URL": "https://SEU-BACKEND.onrender.com/api"
+  }
+}

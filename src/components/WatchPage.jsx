@@ -24,6 +24,26 @@ const WatchPage = () => {
 
         try {
             let currentMovie = movieDetails;
+            
+            // Se veio do modal de série/episódio, usa o videoUrl diretamente
+            if (currentMovie?.videoUrl) {
+                setStatus("Carregando episódio...");
+                setEmbedUrl(currentMovie.videoUrl);
+                setLoading(false);
+                return;
+            }
+            
+            // Se tem embedUrl (filmes do catálogo local)
+            if (currentMovie?.embedUrl && currentMovie.embedUrl !== "NOT_FOUND") {
+                setEmbedUrl(currentMovie.embedUrl);
+                setLoading(false);
+                return;
+            } else if (currentMovie?.embedUrl === "NOT_FOUND") {
+                 setError("Este título está sendo processado e estará disponível em breve.");
+                 setLoading(false);
+                 return;
+            }
+
             if (!currentMovie) {
                 setStatus("Obtendo detalhes...");
                 const data = await fetchData(`/movie/${id}?language=pt-BR`);
@@ -33,16 +53,6 @@ const WatchPage = () => {
                 } else {
                     throw new Error("Filme não encontrado.");
                 }
-            }
-
-            if (currentMovie && currentMovie.embedUrl && currentMovie.embedUrl !== "NOT_FOUND") {
-                setEmbedUrl(currentMovie.embedUrl);
-                setLoading(false);
-                return;
-            } else if (currentMovie?.embedUrl === "NOT_FOUND") {
-                 setError("Este título está sendo processado e estará disponível em breve.");
-                 setLoading(false);
-                 return;
             }
 
             setStatus("Buscando player...");
@@ -57,7 +67,7 @@ const WatchPage = () => {
             const title = currentMovie.title || currentMovie.name;
             const year = (currentMovie.release_date || currentMovie.first_air_date)?.split('-')[0];
 
-            const response = await fetch('http://127.0.0.1:3000/api/get-embed', {
+            const response = await fetch('http://127.0.0.1:8080/api/get-embed', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ title, tmdbId: id, year }),
@@ -102,11 +112,28 @@ const WatchPage = () => {
         
         {movieDetails && (
           <div className="watch-title-info">
-            <h1>{movieDetails.title || movieDetails.name}</h1>
+            <h1>
+              {movieDetails.title || movieDetails.name}
+              {movieDetails.episodeNumber && (
+                <span style={{ fontWeight: 400, opacity: 0.8 }}>
+                  {' '}• S{movieDetails.seasonNumber?.toString().padStart(2, '0')}E{movieDetails.episodeNumber?.toString().padStart(2, '0')}
+                </span>
+              )}
+            </h1>
             <div className="header-meta">
-               <span className="rating"><Star size={14} fill="#ffd700" color="#ffd700" /> {movieDetails.vote_average?.toFixed(1)}</span>
-               <span className="dot">•</span>
-               <span>{(movieDetails.release_date || movieDetails.first_air_date)?.substring(0, 4)}</span>
+               {movieDetails.vote_average > 0 && (
+                 <>
+                   <span className="rating"><Star size={14} fill="#ffd700" color="#ffd700" /> {movieDetails.vote_average?.toFixed(1)}</span>
+                   <span className="dot">•</span>
+                 </>
+               )}
+               <span>{(movieDetails.release_date || movieDetails.first_air_date || movieDetails.year)?.substring(0, 4)}</span>
+               {movieDetails.episodeTitle && (
+                 <>
+                   <span className="dot">•</span>
+                   <span style={{ fontStyle: 'italic' }}>{movieDetails.episodeTitle}</span>
+                 </>
+               )}
             </div>
           </div>
         )}
@@ -150,13 +177,46 @@ const WatchPage = () => {
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.5 }}
             >
-              <iframe
-                src={embedUrl}
-                title={movieDetails?.title || "Player"}
-                className="video-player"
-                allowFullScreen
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              />
+              {/* Para URLs diretas de vídeo (MP4), usa player nativo HTML5 */}
+              {embedUrl?.includes('.mp4') ? (
+                <div className="native-video-player" style={{
+                  width: '100%',
+                  height: '100%',
+                  background: '#000',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  <video
+                    src={embedUrl}
+                    controls
+                    autoPlay
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      maxHeight: '100%'
+                    }}
+                    onError={(e) => {
+                      console.error('Erro ao carregar vídeo:', e);
+                      // Fallback para abrir em nova aba se o vídeo não carregar
+                      window.open(embedUrl, '_blank');
+                    }}
+                  >
+                    Seu navegador não suporta reprodução de vídeo.
+                    <a href={embedUrl} target="_blank" rel="noopener noreferrer" style={{ color: '#e50914' }}>
+                      Clique aqui para abrir o vídeo
+                    </a>
+                  </video>
+                </div>
+              ) : (
+                <iframe
+                  src={embedUrl}
+                  title={movieDetails?.title || "Player"}
+                  className="video-player"
+                  allowFullScreen
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                />
+              )}
             </motion.div>
           )}
         </AnimatePresence>

@@ -52,7 +52,7 @@ const SearchModal = ({ onClose, onMovieClick }) => {
           const tmdbIds = validResults.map(m => m.id);
           if (tmdbIds.length > 0) {
             try {
-              const res = await fetch('http://127.0.0.1:3000/api/cache/check-batch', {
+              const res = await fetch('http://127.0.0.1:8080/api/cache/check-batch', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ tmdbIds })
