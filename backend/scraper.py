@@ -44,13 +44,22 @@ def scrape_for_title(title: str, tmdb_id: str = None, year: str = None) -> str |
     if year:
         query += f"+{year}"
         
-    # 1) Internet Archive search -> try to find archive embed
+    # 1) Opera Topzera (Playwright) - PRIORITIZED for direct MP4s
+    try:
+        from playwright_scraper import scrape_operatopzera
+        logging.info(f"Attempting Opera Topzera (MP4 Bot) scrape for: {title} (Year: {year})")
+        embed = scrape_operatopzera(title, year=year)
+        if embed:
+            return embed
+    except Exception as e:
+        logging.error(f"Opera Topzera scraper failed: {e}")
+
+    # 2) Internet Archive search
     try:
         url = SOURCES[0]["search_url"].format(query=query)
         resp = requests.get(url, headers=HEADERS, timeout=12)
         if resp.status_code == 200:
             soup = BeautifulSoup(resp.text, "html.parser")
-            # Heuristic: look for links to details pages containing embeds
             for a in soup.find_all("a", href=True):
                 href = a["href"]
                 if "/details/" in href or "archive.org/details" in href:
@@ -68,14 +77,12 @@ def scrape_for_title(title: str, tmdb_id: str = None, year: str = None) -> str |
     except Exception:
         pass
 
-    time.sleep(2)
-    # 2) YouTube trailers search
+    # 3) YouTube trailers search
     try:
         url = SOURCES[1]["search_url"].format(query=query)
         resp = requests.get(url, headers=HEADERS, timeout=12)
         if resp.status_code == 200:
             soup = BeautifulSoup(resp.text, "html.parser")
-            # Try to find video ids in links
             for a in soup.find_all("a", href=True):
                 href = a["href"]
                 if "/watch?v=" in href:
@@ -85,17 +92,5 @@ def scrape_for_title(title: str, tmdb_id: str = None, year: str = None) -> str |
                         return embed
     except Exception:
         pass
-
-    # 3) Opera Topzera (Playwright)
-    try:
-        from playwright_scraper import scrape_operatopzera
-        logging.info(f"Attempting Opera Topzera scrape for: {title} (Year: {year})")
-        # The wrapper handles session start if needed, but for bulk we want explicit control
-        embed = scrape_operatopzera(title, year=year)
-        if embed:
-             # Basic validation since it comes from a trusted scrape logic
-            return embed
-    except Exception as e:
-        logging.error(f"Opera Topzera scraper failed: {e}")
 
     return None

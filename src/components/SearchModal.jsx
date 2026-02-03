@@ -124,17 +124,26 @@ const SearchModal = ({ onClose, onMovieClick }) => {
                     onClose();
                   }}
                 >
-                  <img 
-                    src={getPosterUrl(movie.poster_path)} 
-                    alt={movie.title} 
-                    className="search-result-poster"
-                  />
+                  <div className="search-result-poster-container">
+                    <img 
+                      src={getPosterUrl(movie.poster_path)} 
+                      alt="" 
+                      className="search-result-poster"
+                      onError={(e) => {
+                        e.target.onerror = null;
+                        e.target.src = 'https://via.placeholder.com/500x750?text=Sem+Poster';
+                        e.target.classList.add('poster-placeholder');
+                      }}
+                    />
+                  </div>
                   <div className="search-result-info">
                     <h4>{movie.title}</h4>
-                    <span className="search-result-year">
-                      {String(movie.release_date || '').substring(0, 4)}
-                    </span>
-                    <span className="search-result-badge">⚡️ Disponível</span>
+                    <div className="search-result-meta">
+                      <span className="search-result-year">
+                        {String(movie.release_date || '').substring(0, 4) || 'N/A'}
+                      </span>
+                      <span className="search-result-badge">⚡️ Disponível</span>
+                    </div>
                   </div>
                 </div>
               ))}

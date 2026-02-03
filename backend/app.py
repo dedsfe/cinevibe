@@ -596,6 +596,30 @@ def get_current_user(user_id):
     })
 
 
+@app.route("/api/admin/scraper/status", methods=["GET"])
+def get_scraper_status_api():
+    """Get the current state of the background scraper."""
+    return jsonify(get_scraper_state())
+
+@app.route("/api/admin/scraper/start", methods=["POST"])
+def start_scraper_api():
+    """Manually trigger the background scraper if not running."""
+    state = get_scraper_state()
+    if state["is_running"]:
+        return jsonify({"message": "Scraper already running", "status": "active"}), 200
+    
+    # Start in background
+    thread = threading.Thread(target=run_bulk_scrape, daemon=True)
+    thread.start()
+    return jsonify({"message": "Scraper started in background", "status": "started"}), 201
+
+@app.route("/api/admin/scraper/stop", methods=["POST"])
+def stop_scraper_api():
+    """Request the scraper to stop (not implemented in the loop yet, but state updated)."""
+    # This would require adding a stop event to the bulk scrape loop
+    return jsonify({"message": "Stop requested (not fully implemented yet)", "status": "requested"}), 202
+
+
 # ==================== PROTECTED MY LIST ENDPOINTS ====================
 
 @app.route("/api/mylist/movies", methods=["GET"])

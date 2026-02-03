@@ -42,6 +42,7 @@ export const useTMDB = () => {
 
 export const getImageUrl = (path, size = 'w500') => {
   if (!path) return null;
+  if (path.toString().startsWith('http')) return path;
   const cleanPath = path.startsWith('/') ? path.substring(1) : path;
   return `${IMAGE_BASE_URL}/${size}/${cleanPath}`;
 };
