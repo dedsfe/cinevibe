@@ -226,6 +226,47 @@ def get_embed():
     return jsonify({"error": "Embed não encontrado"}), 404
 
 
+@app.route("/api/proxy-video", methods=["GET"])
+def proxy_video():
+    """Proxies a video URL to bypass Mixed Content/CORS issues."""
+    import requests
+    from flask import Response, stream_with_context
+
+    video_url = request.args.get("url")
+    if not video_url:
+        return jsonify({"error": "URL parameter required"}), 400
+
+    def generate():
+        try:
+            # Forward Range header if present (crucial for seeking)
+            headers = {}
+            if "Range" in request.headers:
+                headers["Range"] = request.headers["Range"]
+
+            # Stream the response from the external server
+            # verify=False is needed because the target cert is invalid (as discovered)
+            with requests.get(video_url, stream=True, headers=headers, verify=False, timeout=10) as r:
+                # Forward important headers back to the client
+                response_headers = {
+                    "Content-Type": r.headers.get("Content-Type", "video/mp4"),
+                    "Content-Length": r.headers.get("Content-Length"),
+                    "Accept-Ranges": "bytes",
+                    "Content-Range": r.headers.get("Content-Range"),
+                }
+                
+                # Create generator response
+                return Response(
+                    stream_with_context(r.iter_content(chunk_size=40960)),
+                    status=r.status_code,
+                    headers={k: v for k, v in response_headers.items() if v}
+                )
+        except Exception as e:
+            logging.error(f"Proxy error: {e}")
+            return jsonify({"error": str(e)}), 500
+
+    return generate()
+
+
 @app.route("/api/scrape-background", methods=["POST"])
 def scrape_background():
     data = request.get_json(force=True) or {}

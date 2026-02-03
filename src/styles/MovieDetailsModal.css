@@ -401,22 +401,44 @@
 @media (max-width: 768px) {
   .netflix-modal-content {
     width: 100%;
-    height: 100%;
+    height: auto;
+    min-height: 100%;
     max-width: none;
     border-radius: 0;
     margin: 0;
+    animation: netflix-slide-up 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+    overflow-y: visible;
+  }
+
+  @keyframes netflix-slide-up {
+    from {
+      transform: translateY(100%);
+    }
+    to {
+      transform: translateY(0);
+    }
   }
   
   .netflix-modal-overlay {
     padding: 0;
+    background: #000;
   }
   
   .netflix-hero-title {
-    font-size: 1.6rem;
+    font-size: 1.8rem;
+    max-width: 100%;
+    line-height: 1.1;
+    margin-bottom: 4px;
   }
   
   .netflix-hero-info {
     padding: var(--space-lg);
+    background: linear-gradient(to top, var(--bg-secondary) 0%, rgba(20,20,20,0.8) 50%, transparent 100%);
+    padding-bottom: 0;
+  }
+  
+  .netflix-modal-hero {
+    aspect-ratio: 16 / 10; /* Slightly taller on mobile */
   }
   
   .netflix-modal-body {
@@ -424,23 +446,45 @@
   }
   
   .netflix-actions {
-    flex-wrap: wrap;
+    flex-direction: row;
+    gap: 12px;
+    margin-top: 16px;
+    margin-bottom: 16px;
   }
   
-  .netflix-btn-play,
+  .netflix-btn-play {
+    flex: 2; /* Play button takes more space */
+    height: 48px;
+    font-size: 1rem;
+    border-radius: 8px; /* More modern rect */
+  }
+    
   .netflix-btn-list {
-    height: 46px;
-    padding: 0 20px;
+    flex: 1;
+    height: 48px;
+    font-size: 0; /* Hide text, show only icon on small screens if needed, or keep text */
     font-size: 0.9rem;
+    padding: 0;
+    border-radius: 8px;
+  }
+
+  /* Adjust icons in list button for space */
+  .netflix-btn-list span {
+    display: none; /* Hide text "Minha Lista" on very small/mobile to save space? Or just keep it. Let's keep text but make it fit. */
+    display: inline;
+    font-size: 0.85rem;
   }
   
   .netflix-similar-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, 1fr); /* 2 cols for similar items on mobile too */
+    gap: 10px;
   }
   
   .netflix-meta {
     flex-wrap: wrap;
-    gap: var(--space-sm);
+    gap: 8px;
+    font-size: 0.85rem;
+    margin-bottom: 4px;
   }
 }
 

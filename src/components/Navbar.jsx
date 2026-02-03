@@ -27,8 +27,13 @@ const Navbar = ({ onSearchClick }) => {
       transition={{ duration: 0.5 }}
     >
       <div className="nav-left">
-        <div className="logo" onClick={() => navigate('/movies')}>Filfil</div>
+        <div className="logo" onClick={() => navigate('/home')}>Filfil</div>
         <ul className="nav-links">
+          <li>
+            <Link to="/home" className={isActive('/home') ? 'active' : ''}>
+              <Home size={18} /> Início
+            </Link>
+          </li>
           <li>
             <Link to="/movies" className={isActive('/movies') ? 'active' : ''}>
               <Film size={18} /> Filmes

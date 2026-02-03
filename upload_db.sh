@@ -14,7 +14,7 @@ if [[ "$STATUS" == *"CRASHED"* ]]; then
 fi
 
 echo "🚀 Uploading database..."
-cat backend/links.db | railway ssh "cat > /app/data/links.db"
+cat backend/links.db | railway ssh "cat > /app/links.db"
 
 if [ $? -eq 0 ]; then
   echo "✅ Database uploaded successfully!"

@@ -1,0 +1,51 @@
+/* MobileToggle.css */
+.mobile-toggle-container {
+    display: none;
+    justify-content: center;
+    margin-bottom: 24px;
+    width: 100%;
+    z-index: 90;
+    position: relative;
+}
+
+.toggle-wrapper {
+    background: rgba(20, 20, 25, 0.6);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 100px;
+    padding: 4px;
+    display: flex;
+    position: relative;
+    width: 240px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+}
+
+.toggle-btn {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: rgba(255, 255, 255, 0.6);
+    padding: 8px 0;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    z-index: 2;
+    transition: color 0.3s ease;
+    border-radius: 100px;
+    outline: none; /* Remove focus outline */
+}
+
+.toggle-btn.active {
+    color: #fff;
+}
+
+@media (max-width: 768px) {
+    .mobile-toggle-container {
+        display: flex;
+    }
+}

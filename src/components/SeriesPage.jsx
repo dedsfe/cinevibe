@@ -9,6 +9,7 @@ import MovieCard from './MovieCard';
 import MovieDetailsModal from './MovieDetailsModal';
 import '../styles/HomePage.css';
 import '../styles/MoviesPage.css';
+import MobileToggle from './MobileToggle';
 
 const SeriesPage = () => {
     const [series, setSeries] = useState([]);
@@ -108,72 +109,15 @@ const SeriesPage = () => {
             <Navbar onSearchClick={() => setIsSearchOpen(true)} />
             
             <div className="content-container catalog-container">
+                <MobileToggle />
                 <div className="catalog-header">
                     <h1 className="row-title">
                         <Tv size={32} style={{ marginRight: '12px', verticalAlign: 'middle' }} />
                         SÉRIES
                     </h1>
-                    
-                    {/* Stats */}
-                    <div className="catalog-stats">
-                        <span className="stats-badge available">
-                            <Tv size={14} />
-                            {stats.total} SÉRIES
-                        </span>
-                        <span className="stats-badge">
-                            CARREGADAS: {series.length}
-                        </span>
-                        <span className="stats-badge">
-                            FILTRADAS: {filteredSeries.length}
-                        </span>
-                    </div>
                 </div>
 
-                {/* Debug refresh button */}
-                <div style={{ marginBottom: '16px' }}>
-                    <button 
-                        onClick={fetchSeries}
-                        className="filter-chip"
-                        disabled={loading}
-                    >
-                        {loading ? 'Carregando...' : '🔄 Recarregar Séries'}
-                    </button>
-                </div>
 
-                {/* Search Bar */}
-                <div className="filter-container" style={{ flexWrap: 'wrap', gap: '16px' }}>
-                    <div className="search-input-wrapper" style={{ 
-                        flex: '1 1 300px', 
-                        maxWidth: '500px',
-                        position: 'relative' 
-                    }}>
-                        <Search size={18} style={{ 
-                            position: 'absolute', 
-                            left: '16px', 
-                            top: '50%', 
-                            transform: 'translateY(-50%)',
-                            color: 'var(--text-muted)'
-                        }} />
-                        <input
-                            type="text"
-                            placeholder="Buscar séries..."
-                            value={searchQuery}
-                            onChange={(e) => handleSearch(e.target.value)}
-                            className="search-input"
-                            style={{
-                                width: '100%',
-                                padding: '12px 16px 12px 48px',
-                                borderRadius: '50px',
-                                border: '1px solid var(--glass-border)',
-                                background: 'var(--bg-card)',
-                                color: 'var(--text-primary)',
-                                fontSize: '1rem',
-                                outline: 'none',
-                                transition: 'all 0.2s'
-                            }}
-                        />
-                    </div>
-                </div>
                 
                 {error ? (
                     <div className="row-empty" style={{ color: '#ff4444', textAlign: 'center', padding: '40px' }}>

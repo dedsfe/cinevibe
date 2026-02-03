@@ -378,9 +378,10 @@ const MovieDetailsModal = ({ movie, onClose }) => {
                 <button 
                   className={`btn-secondary netflix-btn-list ${inList ? 'in-list' : ''}`}
                   onClick={handleToggleList}
+                  title={inList ? 'Remover da Lista' : 'Adicionar à Lista'}
+                  style={{ borderRadius: '50%', width: '52px', height: '52px', padding: '0', display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: '52px' }}
                 >
                   {inList ? <Check size={24} /> : <Plus size={24} />}
-                  <span>{inList ? 'Na Minha Lista' : 'Minha Lista'}</span>
                 </button>
               </div>
             </div>

@@ -30,6 +30,7 @@ import MovieCard from './MovieCard';
 import MovieDetailsModal from './MovieDetailsModal';
 import Navbar from './Navbar';
 import SearchModal from './SearchModal';
+import MobileToggle from './MobileToggle';
 
 const streamingBrands = [
   { id: 'disney', name: 'Disney', logo: 'https://upload.wikimedia.org/wikipedia/commons/3/3e/Disney%2B_logo.svg', video: 'https://static-assets.bamgrid.com/product/disneyplus/images/disney.1.2.66.a0100416954a621.mp4' },
@@ -727,6 +728,21 @@ const HeroCarousel = ({ items, onMovieClick }) => {
     return () => clearInterval(timer);
   }, [items.length]);
 
+  const swipeConfidenceThreshold = 10000;
+  const swipePower = (offset, velocity) => {
+    return Math.abs(offset) * velocity;
+  };
+
+  const hasPaginated = useRef(false);
+
+  const paginate = (newDirection) => {
+    if (newDirection === 1) {
+      setCurrentIndex((prev) => (prev + 1) % items.length);
+    } else {
+      setCurrentIndex((prev) => (prev - 1 + items.length) % items.length);
+    }
+  };
+
   return (
     <div className="hero-carousel">
       <AnimatePresence mode="wait">
@@ -737,11 +753,28 @@ const HeroCarousel = ({ items, onMovieClick }) => {
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 1 }}
+          drag="x"
+          dragConstraints={{ left: 0, right: 0 }}
+          dragElastic={1}
+          onDragEnd={(e, { offset, velocity }) => {
+            const swipe = swipePower(offset.x, velocity.x);
+
+            if (swipe < -swipeConfidenceThreshold) {
+              paginate(1);
+            } else if (swipe > swipeConfidenceThreshold) {
+              paginate(-1);
+            }
+          }}
         >
-          <div className="hero-background">
+          <div 
+            className="hero-background" 
+            onClick={() => onMovieClick(current)}
+            style={{ cursor: 'pointer' }}
+          >
             <img 
               src={getBackdropUrl(current.backdrop_path)} 
               alt={current.title || current.name}
+              draggable="false"
             />
             <div className="hero-gradient" />
           </div>
@@ -968,6 +1001,9 @@ const HomePage = () => {
   return (
     <div className="homepage">
       <Navbar onSearchClick={() => setIsSearchOpen(true)} />
+      <div style={{ marginTop: '20px', marginBottom: '-20px', position: 'relative', zIndex: 90 }}>
+        <MobileToggle />
+      </div>
       <HeroCarousel 
         items={allMovies.slice(0, 5)} 
         onMovieClick={handleMovieClick}

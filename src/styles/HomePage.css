@@ -1360,7 +1360,8 @@ section.movie-row {
   }
   
   .hero-title {
-    font-size: 1.75rem;
+    font-size: 2.5rem;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
   }
   
   .hero-overview {
@@ -1369,7 +1370,7 @@ section.movie-row {
   }
   
   .hero-buttons {
-    flex-direction: column;
+    display: none;
   }
   
   .brand-pill-container {

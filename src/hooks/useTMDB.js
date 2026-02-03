@@ -14,11 +14,16 @@ export const useTMDB = () => {
     setError(null);
     try {
       const isLocal = endpoint.startsWith('/api');
-      const baseUrl = API_BASE_URL;
       const separator = endpoint.includes('?') ? '&' : '?';
-      const url = isLocal 
-        ? `${baseUrl}${endpoint}`
-        : `${baseUrl}${endpoint}${separator}api_key=${API_KEY}&language=pt-BR`;
+      
+      let url;
+      if (isLocal) {
+        // Remove '/api' prefix from endpoint if API_BASE_URL already has it
+        const cleanEndpoint = endpoint.startsWith('/api') ? endpoint.substring(4) : endpoint;
+        url = `${API_BASE_URL}${cleanEndpoint}`;
+      } else {
+        url = `${BASE_URL}${endpoint}${separator}api_key=${API_KEY}&language=pt-BR`;
+      }
 
       const response = await fetch(url);
       if (!response.ok) throw new Error('Failed to fetch');

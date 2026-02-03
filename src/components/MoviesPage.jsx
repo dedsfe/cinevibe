@@ -9,6 +9,7 @@ import MovieCard from './MovieCard';
 import MovieDetailsModal from './MovieDetailsModal';
 import '../styles/HomePage.css';
 import '../styles/MoviesPage.css';
+import MobileToggle from './MobileToggle';
 
 const MoviesPage = () => {
     const [movies, setMovies] = useState([]);
@@ -106,57 +107,9 @@ const MoviesPage = () => {
             <Navbar onSearchClick={() => setIsSearchOpen(true)} />
             
             <div className="content-container catalog-container">
+                <MobileToggle />
                 <div className="catalog-header">
                     <h1 className="row-title">CATÁLOGO COMPLETO</h1>
-                    
-                    {/* Stats */}
-                    <div className="catalog-stats">
-                        <span className="stats-badge available">
-                            <CheckCircle size={14} />
-                            {stats.available} DISPONÍVEIS
-                        </span>
-                        <span className="stats-badge pending">
-                            <Clock size={14} />
-                            {stats.pending} PENDENTES
-                        </span>
-                        <span className="stats-badge">
-                            TOTAL: {stats.total}
-                        </span>
-                    </div>
-                </div>
-
-                {/* Filter Buttons */}
-                <div className="filter-container">
-                    <button 
-                        className={`filter-chip ${filter === 'all' ? 'active' : ''}`}
-                        onClick={() => handleFilterChange('all')}
-                    >
-                        <Filter size={14} />
-                        TODOS ({stats.total})
-                    </button>
-                    <button 
-                        className={`filter-chip available ${filter === 'available' ? 'active' : ''}`}
-                        onClick={() => handleFilterChange('available')}
-                    >
-                        <CheckCircle size={14} />
-                        DISPONÍVEIS ({stats.available})
-                    </button>
-                    <button 
-                        className={`filter-chip pending ${filter === 'pending' ? 'active' : ''}`}
-                        onClick={() => handleFilterChange('pending')}
-                    >
-                        <Clock size={14} />
-                        PENDENTES ({stats.pending})
-                    </button>
-                    {stats.youtube > 0 && (
-                        <button 
-                            className={`filter-chip ${filter === 'youtube' ? 'active' : ''}`}
-                            onClick={() => handleFilterChange('youtube')}
-                        >
-                            <AlertTriangle size={14} />
-                            YOUTUBE ({stats.youtube})
-                        </button>
-                    )}
                 </div>
                 
                 {loading ? (

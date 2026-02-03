@@ -11,8 +11,9 @@ function App() {
     <Router>
       <div className="app">
         <Routes>
-          {/* Redirect root to movies page */}
-          <Route path="/" element={<Navigate to="/movies" replace />} />
+          {/* Redirect root to home */}
+          <Route path="/" element={<Navigate to="/home" replace />} />
+          <Route path="/home" element={<HomePage />} />
           <Route path="/movies" element={<MoviesPage />} />
           <Route path="/series" element={<SeriesPage />} />
           <Route path="/mylist" element={<MyListPage />} />

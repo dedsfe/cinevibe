@@ -18,6 +18,17 @@ const WatchPage = () => {
   const [error, setError] = useState(null);
   const [status, setStatus] = useState("Iniciando...");
 
+  // Helper to force clean HTTPS via backend proxy
+  const getSecureUrl = (url) => {
+    if (!url) return null;
+    
+    // Use Proxy
+    const proxyUrl = `${API_BASE_URL}/proxy-video?url=${encodeURIComponent(url)}`;
+    console.log("Original URL:", url);
+    console.log("Proxy URL:", proxyUrl);
+    return proxyUrl;
+  };
+
   useEffect(() => {
     const init = async () => {
         setLoading(true);
@@ -183,31 +194,51 @@ const WatchPage = () => {
                 <div className="native-video-player" style={{
                   width: '100%',
                   height: '100%',
-                  background: '#000',
+                  background: `url(${getBackdropUrl(movieDetails?.backdrop_path)}) center/cover no-repeat`,
                   display: 'flex',
+                  flexDirection: 'column',
                   alignItems: 'center',
-                  justifyContent: 'center'
+                  justifyContent: 'center',
+                  position: 'relative',
+                  borderRadius: '12px'
                 }}>
-                  <video
-                    src={embedUrl}
-                    controls
-                    autoPlay
-                    style={{
-                      width: '100%',
-                      height: '100%',
-                      maxHeight: '100%'
-                    }}
-                    onError={(e) => {
-                      console.error('Erro ao carregar vídeo:', e);
-                      // Fallback para abrir em nova aba se o vídeo não carregar
-                      window.open(embedUrl, '_blank');
-                    }}
-                  >
-                    Seu navegador não suporta reprodução de vídeo.
-                    <a href={embedUrl} target="_blank" rel="noopener noreferrer" style={{ color: '#e50914' }}>
-                      Clique aqui para abrir o vídeo
-                    </a>
-                  </video>
+                  {/* Dark Overlay */}
+                  <div style={{
+                    position: 'absolute',
+                    inset: 0,
+                    background: 'rgba(0,0,0,0.6)',
+                    borderRadius: '12px'
+                  }} />
+
+                  {/* Launcher Content */}
+                  <div style={{ zIndex: 10, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                    <motion.button
+                      whileHover={{ scale: 1.1 }}
+                      whileTap={{ scale: 0.9 }}
+                      onClick={() => window.open(embedUrl, '_blank')}
+                      style={{
+                        background: '#e50914',
+                        border: 'none',
+                        borderRadius: '50%',
+                        width: '80px',
+                        height: '80px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer',
+                        boxShadow: '0 0 20px rgba(229, 9, 20, 0.5)',
+                        marginBottom: '16px'
+                      }}
+                    >
+                      <Play size={40} fill="white" color="white" style={{ marginLeft: '4px' }} />
+                    </motion.button>
+                     <p style={{ fontSize: '1.2rem', fontWeight: 600, textShadow: '0 2px 4px rgba(0,0,0,0.8)' }}>
+                        Toque para Assistir
+                     </p>
+                     <p style={{ fontSize: '0.9rem', opacity: 0.8, marginTop: '4px' }}>
+                        O vídeo abrirá em uma nova janela
+                     </p>
+                  </div>
                 </div>
               ) : (
                 <iframe
@@ -374,6 +405,30 @@ const WatchPage = () => {
 
         .btn-retry:hover {
           transform: scale(1.05);
+        }
+
+        .external-player-btn {
+          position: absolute;
+          bottom: 20px;
+          right: 20px;
+          background: rgba(0, 0, 0, 0.6);
+          backdrop-filter: blur(10px);
+          padding: 8px 16px;
+          border-radius: 8px;
+          color: rgba(255, 255, 255, 0.7);
+          font-size: 0.85rem;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          text-decoration: none;
+          transition: all 0.2s;
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          z-index: 20;
+        }
+        
+        .external-player-btn:hover {
+          background: rgba(255, 255, 255, 0.9);
+          color: #000;
         }
 
         @keyframes spin {

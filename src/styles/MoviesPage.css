@@ -113,15 +113,47 @@
 
 @media (max-width: 768px) {
     .catalog-container {
-        padding-top: 100px;
+        padding-top: 80px; /* Reduced from 100px */
+        padding-left: 16px; /* Increased from 10px for better alignment */
+        padding-right: 16px;
     }
     
+    .catalog-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 16px;
+        margin-bottom: 24px;
+    }
+
     .catalog-header .row-title {
         font-size: 1.5rem;
+        display: none; /* Hide 'CATALOGO COMPLETO' on mobile since we have the toggle */
     }
     
     .catalog-grid {
-        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-        gap: 16px;
+        grid-template-columns: repeat(2, 1fr); /* 2 columns */
+        gap: 12px; /* Nicer gap, not too wide/small */
+        padding-bottom: 40px;
+    }
+
+    /* Force cards to fit grid */
+    .catalog-grid .grid-item {
+        width: 100%;
+        display: flex;
+        justify-content: center;
+    }
+
+    .catalog-grid .movie-card {
+        width: 100% !important; /* Override variable width */
+        flex: none;
+    }
+    
+    /* Center status badges on mobile stats */
+    .catalog-stats {
+        width: 100%;
+        justify-content: flex-start;
+        gap: 8px;
+        overflow-x: auto;
+        padding-bottom: 8px;
     }
 }
