@@ -135,105 +135,172 @@ async def main():
 
     await scrape_channel(args.channel, args.query, args.limit, args.count)
 
+async def join_and_scrape_content(app, invite_link, series_title, limit, max_success):
+    print(f"🔄 Tentando entrar no canal de conteúdo: {invite_link}")
+    try:
+        try:
+            chat = await app.join_chat(invite_link)
+            chat_id = chat.id
+            print(f"✅ Entrou com sucesso no canal: {chat.title} ({chat_id})")
+        except Exception as e:
+            if "USER_ALREADY_PARTICIPANT" in str(e):
+                # We need to resolve the chat_id from the invite link if possible, 
+                # or simpler: just use get_chat if it was a public username, but for +links we might need to peek.
+                # If we are already participant, join_chat usually returns the chat anyway in recent Pyrogram versions?
+                # If not, we might need another way. Let's assume join_chat works or returns info.
+                print("   (Já é membro do canal)")
+                # Inspecting invite link to see if we can get preview or just try to continue if we knew the ID.
+                # For now, let's treat it as a skip or try to get chat from invite link info.
+                try:
+                    chat = await app.get_chat(invite_link)
+                    chat_id = chat.id
+                except:
+                    print(f"❌ Não foi possível obter ID do chat já participado: {e}")
+                    return 0, 0
+            else:
+                print(f"❌ Erro ao entrar: {e}")
+                return 0, 0
+
+        print(f"📚 Lendo episódios de {chat.title}...")
+        
+        count_series = 0
+        count_movies = 0
+        
+        async for message in app.get_chat_history(chat_id, limit=limit):
+            # Same parsing logic as before, but focused on this chat
+            try:
+                raw_text = message.text or message.caption or ""
+                
+                file_id = None
+                if message.video:
+                    file_id = f"tg_file_id:{message.video.file_id}"
+                
+                links = extract_links(message)
+                video_url = file_id if file_id else (links[0] if links else None)
+                
+                if not video_url:
+                    continue
+
+                # Use the passed series_title, but look for specific episode info in this message
+                season, episode = parse_series_info(raw_text)
+                
+                # If failing to parse season/ep from text, try filename
+                if message.video and message.video.file_name and (season is None or episode is None):
+                    fs, fe = parse_series_info(message.video.file_name)
+                    if season is None: season = fs
+                    if episode is None: episode = fe
+
+                # Fallback: if we are in a "Series channel", and have video, but no explicit S/E info,
+                # we might be looking at a movie file or just a tough filename.
+                # But usually these channels have "S01 E01" etc.
+                
+                # Clean title for episode might just be "Episódio 1"
+                ep_title = clean_title(raw_text) or f"Episódio {episode}"
+
+                if season and episode and HAS_SERIES_DB:
+                    print(f"   📺 [S{season:02}E{episode:02}] Found in content channel")
+                    
+                    opera_id = slugify(series_title)
+                    s_id = save_series(opera_id, series_title, overview=f"Imported from {chat.title}")
+                    if s_id:
+                         ses_id = save_season(s_id, season, title=f"Temporada {season}")
+                         if ses_id:
+                              save_episode(s_id, ses_id, episode, 
+                                         title=ep_title, 
+                                         video_url=video_url,
+                                         video_type='tg_file' if 'tg_file_id' in video_url else 'mp4')
+                              count_series += 1
+                else:
+                    # Maybe it's a movie inside a collection channel?
+                    pass
+
+            except Exception as e:
+                print(f"Error parsing msg {message.id}: {e}")
+                
+        return count_movies, count_series
+
+    except Exception as e:
+        print(f"❌ Critical error accessing content channel: {e}")
+        return 0, 0
+
+
 async def scrape_channel(target_channel, search_query, limit, max_success):
     print(f"\n🚀 Conectando ao Telegram...")
     async with Client(SESSION_NAME, api_id=API_ID, api_hash=API_HASH) as app:
         print(f"✅ Conectado!")
         
-        # Generator: Search in Channel, Global Search, or History
+        # Generator: Search in Channel
         if search_query:
-            print(f"🔎 Buscando por '{search_query}'...")
-            if target_channel:
-                print(f"   (Filtro: {target_channel})")
-                message_iterator = app.search_messages(target_channel, query=search_query, limit=limit)
-            else:
-                message_iterator = app.search_global(query=search_query, limit=limit)
+            print(f"🔎 Buscando por '{search_query}' em {target_channel}...")
+            message_iterator = app.search_messages(target_channel, query=search_query, limit=limit)
         else:
             print(f"📚 Lendo histórico de {target_channel}...")
             message_iterator = app.get_chat_history(target_channel, limit=limit)
         
-        count_movies = 0
-        count_series = 0
-        count_total = 0
-        found_any = False
+        total_movies = 0
+        total_episodes = 0
+        processed_links = set()
         
         async for message in message_iterator:
-            found_any = True
-            if max_success > 0 and count_total >= max_success:
-                break
+            # Check for "Assistir" functionality first (The new flow)
+            found_assistir = False
+            invite_link = None
             
-            # For Global search fallback, if user specified a channel, only pick that channel
-            if target_channel and not search_query.startswith("GLOBAL:"):
-                # verify chat
-                pass # search_messages already filters
+            # Check Text Links
+            if message.entities or message.caption_entities:
+                ents = message.entities or message.caption_entities
+                for ent in ents:
+                    if ent.type.name == "TEXT_LINK" and ent.url:
+                        # Check if it looks like a telegram invite
+                        if "t.me/+" in ent.url or "t.me/joinchat" in ent.url:
+                             invite_link = ent.url
+                             found_assistir = True
             
-            try:
-                # 1. Get Content
+            # Check Buttons
+            if not found_assistir and message.reply_markup and hasattr(message.reply_markup, 'inline_keyboard'):
+                for row in message.reply_markup.inline_keyboard:
+                    for btn in row:
+                        if "Assistir" in (btn.text or "") and btn.url:
+                            invite_link = btn.url
+                            found_assistir = True
+            
+            if found_assistir and invite_link:
+                if invite_link in processed_links:
+                    print(f"⏩ Link já processado, pulando: {invite_link}")
+                    continue
+                
+                processed_links.add(invite_link)
+
+                # Get the Series Title from this main message
                 raw_text = message.text or message.caption or ""
+                series_title = clean_title(raw_text)
                 
-                # Check for Video File
-                file_id = None
-                if message.video:
-                    file_id = f"tg_file_id:{message.video.file_id}"
+                # If the title is generic "Assistir", try to parse from first line
+                if "Assistir" in series_title or len(series_title) < 3:
+                     # Heuristic: First line often has "Serie: Title"
+                     lines = raw_text.split('\n')
+                     for line in lines:
+                         if "ie:" in line or "fix:" in line: # Série: or Serie:
+                             parts = line.split(":")
+                             if len(parts) > 1:
+                                 series_title = parts[1].strip()
+                                 break
                 
-                # Check for Links
-                links = extract_links(message)
+                print(f"\n🎯 FOUND CATALOG ENTRY: {series_title}")
+                print(f"   Link: {invite_link}")
                 
-                # If it's a "following" message redirecting to another channel
-                # e.g., t.me/c/123/456 or @Channel
-                # For now, let's just take the first link found
-                video_url = file_id if file_id else (links[0] if links else None)
+                # Go Deep!
+                m, s = await join_and_scrape_content(app, invite_link, series_title, limit=100, max_success=max_success)
+                total_movies += m
+                total_episodes += s
                 
-                if not video_url:
-                    continue 
-
-                # 2. Analyze Content
-                title = clean_title(raw_text)
-                if not title or len(title) < 3:
-                    # Try to get title from video file name
-                    if message.video and message.video.file_name:
-                        title = clean_title(message.video.file_name)
-                
-                if not title: title = f"Video_{message.id}"
-
-                season, episode = parse_series_info(raw_text)
-                
-                # 3. Save to DB
-                success = False
-                if season is not None and episode is not None and HAS_SERIES_DB:
-                    print(f"📺 [S{season:02}E{episode:02}] {title}")
-                    
-                    opera_id = slugify(title)
-                    s_id = save_series(opera_id, title, overview=raw_text)
-                    if s_id:
-                        ses_id = save_season(s_id, season, title=f"Temporada {season}")
-                        if ses_id:
-                             save_episode(s_id, ses_id, episode, 
-                                        title=f"Episódio {episode}", 
-                                        video_url=video_url,
-                                        video_type='tg_file' if 'tg_file_id' in video_url else 'mp4')
-                             count_series += 1
-                             success = True
-                else:
-                    print(f"🎬 [Movie] {title}")
-                    save_embed(title, video_url, tmdb_id=None, overview=raw_text)
-                    count_movies += 1
-                    success = True
-                
-                if success:
-                    count_total += 1
-                    if max_success > 0 and count_total >= max_success:
-                        break
-                    
-            except Exception as e:
-                pass # Silently skip errors for global search noise
-
-        if not found_any and search_query:
-            print(f"⚠️  Nenhuma mensagem encontrada para '{search_query}'.")
-
+            else:
+                # fallback to old logic for direct files in main channel
+                pass 
+        
         print(f"\n✨ Finalizado!")
-        print(f"   Filmes: {count_movies}")
-        print(f"   Episódios: {count_series}")
+        print(f"   Filmes: {total_movies}")
+        print(f"   Episódios: {total_episodes}")
 
 if __name__ == "__main__":
     asyncio.run(main())

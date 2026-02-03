@@ -142,7 +142,11 @@ const SearchModal = ({ onClose, onMovieClick }) => {
                       <span className="search-result-year">
                         {String(movie.release_date || '').substring(0, 4) || 'N/A'}
                       </span>
-                      <span className="search-result-badge">⚡️ Disponível</span>
+                      {movie.isAvailable ? (
+                        <span className="search-result-badge">⚡️ Disponível</span>
+                      ) : (
+                        <span className="search-result-badge" style={{ color: 'var(--text-tertiary)' }}>🔍 No TMDB</span>
+                      )}
                     </div>
                   </div>
                 </div>

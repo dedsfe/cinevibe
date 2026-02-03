@@ -45,6 +45,10 @@ from scraper import scrape_for_title
 from playwright_scraper import scrape_operatopzera
 from validator import validate_embed
 from bulk_scrape_tmdb import run_bulk_scrape, get_scraper_state
+import requests
+
+TMDB_API_KEY = "909fc389a150847bdd4ffcd92809cff7"
+TMDB_BASE_URL = "https://api.themoviedb.org/3"
 
 # Simple token storage (in production use JWT or sessions)
 # Format: {token: {user_id, expires}}
@@ -115,9 +119,40 @@ def create_default_admin():
 create_default_admin()
 
 
+def search_tmdb(query):
+    """Search TMDB for movies and series."""
+    results = []
+    try:
+        # Search Movies
+        res = requests.get(f"{TMDB_BASE_URL}/search/movie", params={
+            "api_key": TMDB_API_KEY,
+            "query": query,
+            "language": "pt-BR"
+        })
+        if res.status_code == 200:
+            for item in res.json().get("results", []):
+                item["media_type"] = "movie"
+                results.append(item)
+        
+        # Search Series
+        res = requests.get(f"{TMDB_BASE_URL}/search/tv", params={
+            "api_key": TMDB_API_KEY,
+            "query": query,
+            "language": "pt-BR"
+        })
+        if res.status_code == 200:
+            for item in res.json().get("results", []):
+                item["media_type"] = "tv"
+                item["title"] = item.get("name") # TMDB uses 'name' for TV
+                item["release_date"] = item.get("first_air_date")
+                results.append(item)
+    except Exception as e:
+        logging.error(f"TMDB Search Error: {e}")
+    return results
+
 @app.route("/api/search/all", methods=["GET", "POST"])
 def unified_search_all():
-    """Unified search for movies and series."""
+    """Unified search for movies and series, combining local and TMDB results."""
     query = request.args.get("q", "") or (request.json.get("q") if request.is_json else "")
     query = query.strip()
     limit = int(request.args.get("limit", 50))
@@ -125,21 +160,26 @@ def unified_search_all():
     if not query:
         return jsonify({"results": []})
         
-    movies = search_movies_locally(query, limit)
-    series = search_series_locally(query, limit)
+    # 1. Search locally
+    local_movies = search_movies_locally(query, limit)
+    local_series = search_series_locally(query, limit)
     
-    # Combined results
-    results = movies + series
+    # 2. Combine results (Local Only)
+    final_results = []
     
-    # Sort combined by exact match first if needed, or by title
+    # Add local results
+    for item in local_movies + local_series:
+        final_results.append(item)
+            
+    # Sort: Exact match -> Alphabetical
     def sort_key(x):
         title = x.get('title') or ""
-        exact = 0 if query.lower() in title.lower() else 1
+        exact = 0 if query.lower() == title.lower() else 1
         return (exact, title.lower())
     
-    results.sort(key=sort_key)
+    final_results.sort(key=sort_key)
     
-    return jsonify({"results": results[:limit]})
+    return jsonify({"results": final_results[:limit]})
 
 @app.route("/api/debug/ping", methods=["GET"])
 def debug_ping():
@@ -613,6 +653,36 @@ def start_scraper_api():
     thread.start()
     return jsonify({"message": "Scraper started in background", "status": "started"}), 201
 
+@app.route("/api/admin/scrape/title", methods=["POST"])
+def scrape_specific_title():
+    """Trigger a scrape for a specific title."""
+    data = request.get_json(force=True) or {}
+    title = data.get("title")
+    tmdb_id = data.get("tmdb_id")
+    year = data.get("year")
+    
+    if not title:
+        return jsonify({"error": "Title is required"}), 400
+        
+    logging.info(f"On-demand scrape requested for: {title}")
+    
+    # Start in background thread to avoid timeout
+    def on_demand_worker():
+        try:
+            embed = scrape_for_title(title, tmdb_id, year=year)
+            if embed:
+                save_embed(title, embed, tmdb_id, year=year)
+                logging.info(f"Successfully scraped and saved: {title}")
+            else:
+                logging.warning(f"Failed to find embed for: {title}")
+        except Exception as e:
+            logging.error(f"On-demand scrape error for {title}: {e}")
+
+    thread = threading.Thread(target=on_demand_worker, daemon=True)
+    thread.start()
+    
+    return jsonify({"message": f"Scrape initiated for {title}", "status": "initiated"}), 202
+
 @app.route("/api/admin/scraper/stop", methods=["POST"])
 def stop_scraper_api():
     """Request the scraper to stop (not implemented in the loop yet, but state updated)."""
@@ -703,7 +773,7 @@ def check_series_in_list(user_id, series_id):
 if __name__ == "__main__":
     # Start auto-precache in background (daemon thread so it doesn't block exit)
     logging.info("Starting background auto-precache task...")
-    threading.Thread(target=run_bulk_scrape, daemon=True).start()
+    # threading.Thread(target=run_bulk_scrape, daemon=True).start()
 
     # Run locally on 127.0.0.1:8080 (or from PORT env var)
     # Port 5000 is used by macOS AirPlay, so we use 8080
@@ -713,4 +783,4 @@ if __name__ == "__main__":
     print(f"   - http://127.0.0.1:{port}/api/health")
     print(f"   - http://127.0.0.1:{port}/api/catalog")
     print(f"   - http://127.0.0.1:{port}/api/series\n")
-    app.run(host="127.0.0.1", port=port, debug=True)
+    app.run(host="127.0.0.1", port=port, debug=False)

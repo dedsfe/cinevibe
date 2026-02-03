@@ -64,9 +64,21 @@ const MovieCard = ({ movie, index, onClick, isAvailable }) => {
           alt={movie.title || movie.name}
           className="movie-poster"
           loading="lazy"
+          onError={(e) => {
+            e.target.onerror = null;
+            e.target.src = 'https://via.placeholder.com/500x750?text=Sem+Poster';
+            e.target.classList.add('poster-placeholder');
+          }}
         />
         
-        {/* Hover clean - sem overlay */}
+        {/* Status Badge */}
+        {movie.isAvailable && (
+          <div className="status-badge available">
+            ⚡️ Disponível
+          </div>
+        )}
+        
+        {/* Hover overlay if needed */}
       </div>
     </motion.div>
   );

@@ -19,33 +19,12 @@ const useDebounce = (value, delay) => {
 const SearchPage = () => {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
-  const [availability, setAvailability] = useState({});
   const [isSearching, setIsSearching] = useState(false);
   const { fetchData } = useTMDB();
   const navigate = useNavigate();
   
   const debouncedQuery = useDebounce(query, 500);
 
-  // Check availability with local backend
-  const checkAvailability = async (movies) => {
-    if (!movies?.length) return;
-    try {
-      const tmdbIds = movies.map(m => m.id);
-      const response = await fetch(`${API_BASE_URL}/cache/check-batch`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ tmdb_ids: tmdbIds }),
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setAvailability(prev => ({ ...prev, ...data }));
-      }
-    } catch (err) {
-      console.error("Failed to check availability", err);
-    }
-  };
 
   useEffect(() => {
     const searchMovies = async () => {
@@ -56,12 +35,9 @@ const SearchPage = () => {
 
       setIsSearching(true);
       try {
-        const data = await fetchData(`/search/movie?query=${encodeURIComponent(debouncedQuery)}`);
+        const data = await fetchData(`/api/search/all?q=${encodeURIComponent(debouncedQuery)}`);
         if (data && data.results) {
-          // Filter out results without poster or backdrop to keep quality high? Optional.
-          const validResults = data.results.filter(m => m.poster_path);
-          setResults(validResults);
-          checkAvailability(validResults);
+          setResults(data.results);
         }
       } catch (error) {
         console.error("Search failed", error);
@@ -111,7 +87,6 @@ const SearchPage = () => {
                   movie={movie}
                   index={index}
                   onClick={handleMovieClick}
-                  isAvailable={availability[movie.id]}
                 />
               ))}
             </div>

@@ -191,8 +191,6 @@ def get_catalog_movies(limit=100, offset=0):
             """
             SELECT tmdb_id, title, embed_url, poster_path, backdrop_path, overview
             FROM links
-            WHERE embed_url IS NOT NULL
-              AND embed_url != 'NOT_FOUND'
             ORDER BY added_at DESC
             LIMIT ? OFFSET ?
         """,
@@ -215,6 +213,7 @@ def get_catalog_movies(limit=100, offset=0):
                     # Fallback: use title hash
                     movie_id = str(hash(row["title"]) % 10000000)
 
+            is_valid = row["embed_url"] and row["embed_url"] != "NOT_FOUND" 
             movies.append(
                 {
                     "id": movie_id,
@@ -222,7 +221,7 @@ def get_catalog_movies(limit=100, offset=0):
                     "poster_path": row["poster_path"],
                     "backdrop_path": row["backdrop_path"],
                     "overview": row["overview"],
-                    "isAvailable": row["embed_url"] != "NOT_FOUND",
+                    "isAvailable": is_valid,
                     "embedUrl": row["embed_url"],
                 }
             )
@@ -243,8 +242,6 @@ def search_movies_locally(query: str, limit=50):
             SELECT id, tmdb_id, title, embed_url, poster_path, backdrop_path, overview, year, added_at
             FROM links
             WHERE title LIKE ? 
-              AND embed_url IS NOT NULL 
-              AND embed_url != 'NOT_FOUND'
             ORDER BY 
               CASE WHEN title LIKE ? THEN 1 ELSE 2 END, -- Exact start match priority
               added_at DESC
@@ -256,6 +253,7 @@ def search_movies_locally(query: str, limit=50):
 
         results = []
         for row in rows:
+            is_valid = row["embed_url"] and row["embed_url"] != "NOT_FOUND"
             results.append(
                 {
                     "id": row["tmdb_id"] or f"local_{row['id']}",
@@ -264,7 +262,7 @@ def search_movies_locally(query: str, limit=50):
                     "backdrop_path": row["backdrop_path"],
                     "overview": row["overview"],
                     "release_date": row["year"] or "", 
-                    "isAvailable": True,
+                    "isAvailable": is_valid,
                     "embedUrl": row["embed_url"],
                 }
             )
