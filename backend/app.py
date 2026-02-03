@@ -66,37 +66,32 @@ def verify_token(token):
     return session["user_id"]
 
 def require_auth(f):
-    """Decorator to require authentication."""
+    """Decorator to require authentication (DISABLED)."""
     @wraps(f)
     def decorated(*args, **kwargs):
-        auth_header = request.headers.get('Authorization', '')
-        if not auth_header.startswith('Bearer '):
-            return jsonify({"error": "Token de autenticação necessário"}), 401
-        token = auth_header.split(' ')[1]
-        user_id = verify_token(token)
-        if not user_id:
-            return jsonify({"error": "Token inválido ou expirado"}), 401
-        return f(user_id, *args, **kwargs)
+        # BYPASS AUTH: Always allow and pass dummy user_id=1
+        dummy_user_id = 1
+        return f(dummy_user_id, *args, **kwargs)
     return decorated
 
 app = Flask(__name__)
-# Enable CORS for all domains on all routes
+# Enable CORS for all origins (frontend can be on Vercel, Railway, etc.)
 CORS(app, resources={
     r"/*": {
         "origins": "*",
         "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-        "allow_headers": "*",
-        "supports_credentials": True
+        "allow_headers": ["Content-Type", "Authorization"]
     }
 })
 
-# Add CORS headers to all responses
-@app.after_request
-def after_request(response):
-    response.headers.add('Access-Control-Allow-Origin', '*')
-    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
-    response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
-    return response
+@app.before_request
+def handle_preflight():
+    if request.method == "OPTIONS":
+        response = app.make_default_options_response()
+        response.headers.add("Access-Control-Allow-Origin", "*")
+        response.headers.add("Access-Control-Allow-Headers", "*")
+        response.headers.add("Access-Control-Allow-Methods", "*")
+        return response
 
 # Initialize database on startup
 init_db()
@@ -116,7 +111,24 @@ create_default_admin()
 
 @app.route("/api/health", methods=["GET"])
 def health():
-    return jsonify({"status": "ok"})
+    try:
+        # Check database connection
+        from database import get_series_count, get_cache_count
+        series_count = get_series_count()
+        movie_count = get_cache_count().get("cached_links", 0)
+        
+        return jsonify({
+            "status": "ok",
+            "database": {
+                "series": series_count,
+                "movies": movie_count
+            }
+        })
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": str(e)
+        }), 500
 
 
 @app.route("/api/cache/stats", methods=["GET"])

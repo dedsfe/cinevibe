@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { API_BASE_URL } from '../config';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CheckCircle, Clock, AlertTriangle, Youtube, Filter } from 'lucide-react';
@@ -23,7 +24,7 @@ const MoviesPage = () => {
         const fetchCatalog = async (isBackground = false) => {
             try {
                 if (!isBackground) setLoading(true);
-                const response = await fetch('http://127.0.0.1:8080/api/catalog?limit=1000');
+                const response = await fetch(`${API_BASE_URL}/catalog?limit=1000`);
                 if (response.ok) {
                     const data = await response.json();
                     

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { API_BASE_URL } from '../config';
 import { useNavigate } from 'react-router-dom';
 import { Search, Loader2, Info } from 'lucide-react';
 import { useTMDB } from '../hooks/useTMDB';
@@ -30,7 +31,7 @@ const SearchPage = () => {
     if (!movies?.length) return;
     try {
       const tmdbIds = movies.map(m => m.id);
-      const response = await fetch('http://127.0.0.1:8080/api/cache/check-batch', {
+      const response = await fetch(`${API_BASE_URL}/cache/check-batch`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

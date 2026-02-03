@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { API_BASE_URL } from '../config';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, Loader2, X } from 'lucide-react';
 import { useTMDB, getPosterUrl } from '../hooks/useTMDB';
@@ -52,7 +53,7 @@ const SearchModal = ({ onClose, onMovieClick }) => {
           const tmdbIds = validResults.map(m => m.id);
           if (tmdbIds.length > 0) {
             try {
-              const res = await fetch('http://127.0.0.1:8080/api/cache/check-batch', {
+              const res = await fetch(`${API_BASE_URL}/cache/check-batch`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ tmdbIds })

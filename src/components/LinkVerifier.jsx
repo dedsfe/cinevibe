@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { API_BASE_URL } from '../config';
 import { useNavigate } from 'react-router-dom';
 import { 
   ArrowLeft, 
@@ -25,7 +26,7 @@ const LinkVerifier = () => {
 
   const fetchMovies = async () => {
     try {
-      const response = await fetch('http://127.0.0.1:8080/api/catalog?limit=1000');
+      const response = await fetch(`${API_BASE_URL}/catalog?limit=1000`);
       const data = await response.json();
       if (data.results) {
         // Only show movies with links (not NOT_FOUND)
@@ -45,7 +46,7 @@ const LinkVerifier = () => {
     setVerifyResult(null);
 
     try {
-      const response = await fetch('http://127.0.0.1:8080/api/verify-link', {
+      const response = await fetch(`${API_BASE_URL}/verify-link`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -68,7 +69,7 @@ const LinkVerifier = () => {
 
     setFixing(true);
     try {
-      const response = await fetch('http://127.0.0.1:8080/api/fix-link', {
+      const response = await fetch(`${API_BASE_URL}/fix-link`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { API_BASE_URL } from '../config';
 import { motion } from 'framer-motion';
 import { Terminal, Activity, CheckCircle, AlertCircle, Play } from 'lucide-react';
 
@@ -8,7 +9,7 @@ const ScraperStatus = () => {
 
   const fetchStatus = async () => {
     try {
-      const res = await fetch('http://127.0.0.1:8080/api/scraper/status');
+      const res = await fetch(`${API_BASE_URL}/scraper/status`);
       if (res.ok) {
         const data = await res.json();
         setStatus(data);

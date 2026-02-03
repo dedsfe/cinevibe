@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
+import { API_BASE_URL } from '../config';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -390,7 +391,7 @@ const WatchModal = ({ movie, onClose }) => {
     setError(null);
     
     try {
-        const response = await fetch('http://127.0.0.1:8080/api/get-embed', {
+        const response = await fetch(`${API_BASE_URL}/get-embed`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -615,7 +616,7 @@ const LazyMovieRow = ({ title, fetchEndpoint, onMovieClick }) => {
         const tmdbIds = validMovies.map(m => m.id);
         if (tmdbIds.length > 0) {
             try {
-                const checkRes = await fetch('http://127.0.0.1:8080/api/cache/check-batch', {
+                const checkRes = await fetch(`${API_BASE_URL}/cache/check-batch`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ tmdbIds })

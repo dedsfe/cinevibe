@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { API_BASE_URL } from '../config';
 
 const API_KEY = '909fc389a150847bdd4ffcd92809cff7';
 const BASE_URL = 'https://api.themoviedb.org/3';
@@ -13,7 +14,7 @@ export const useTMDB = () => {
     setError(null);
     try {
       const isLocal = endpoint.startsWith('/api');
-      const baseUrl = isLocal ? 'http://127.0.0.1:8080' : BASE_URL;
+      const baseUrl = API_BASE_URL;
       const separator = endpoint.includes('?') ? '&' : '?';
       const url = isLocal 
         ? `${baseUrl}${endpoint}`

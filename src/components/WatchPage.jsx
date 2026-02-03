@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '../config';
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { ArrowLeft, AlertCircle, Play, Info, Star, Calendar, Clock } from 'lucide-react';
@@ -67,7 +68,7 @@ const WatchPage = () => {
             const title = currentMovie.title || currentMovie.name;
             const year = (currentMovie.release_date || currentMovie.first_air_date)?.split('-')[0];
 
-            const response = await fetch('http://127.0.0.1:8080/api/get-embed', {
+            const response = await fetch(`${API_BASE_URL}/get-embed`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ title, tmdbId: id, year }),

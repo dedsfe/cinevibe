@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { API_BASE_URL } from '../config';
 import { useNavigate } from 'react-router-dom';
 import { 
   CheckCircle, 
@@ -29,7 +30,7 @@ const AdminPage = () => {
     setLoading(true);
     try {
       // Fetch catalog from backend
-      const response = await fetch('http://127.0.0.1:8080/api/catalog?limit=1000');
+      const response = await fetch(`${API_BASE_URL}/catalog?limit=1000`);
       const data = await response.json();
       
       if (data.results) {

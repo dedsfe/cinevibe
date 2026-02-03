@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '../config';
 // IndexedDB Database for Filfil
 const DB_NAME = 'FilfilDB';
 const DB_VERSION = 4; // Incremented to force upgrade
@@ -53,7 +54,7 @@ export const addToMyList = async (movie) => {
     const request = store.put(item);
     request.onsuccess = () => {
       // Trigger background scrape
-      fetch('http://127.0.0.1:8080/api/scrape-background', {
+      fetch(`${API_BASE_URL}/scrape-background`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
