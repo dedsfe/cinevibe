@@ -1,0 +1,17 @@
+node_modules
+dist
+.git
+.vercel
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.db
+link_checker.db
+links.db
+movies.db
+backend/links.db
+backend/movies.db
+venv
+.env
+.DS_Store
