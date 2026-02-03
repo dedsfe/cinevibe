@@ -50,7 +50,7 @@ const SearchModal = ({ onClose, onMovieClick }) => {
         console.log(`Searching for: ${query} at ${API_BASE_URL}`);
         // Search exclusively in local database
         // API_BASE_URL already ends with /api
-        const response = await fetch(`${API_BASE_URL}/movies/search?q=${encodeURIComponent(query)}`);
+        const response = await fetch(`${API_BASE_URL}/search/all?q=${encodeURIComponent(query)}`);
         
         if (!response.ok) {
           throw new Error(`Server Error: ${response.status}`);

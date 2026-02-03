@@ -88,17 +88,7 @@ CORS(app, resources={
     }
 })
 
-# Global OPTIONS handler for all API routes
-@app.route('/api/<path:path>', methods=['OPTIONS'])
-def handle_api_options(path):
-    response = app.make_response('')
-    response.status_code = 204
-    origin = request.headers.get('Origin', '*')
-    response.headers['Access-Control-Allow-Origin'] = origin
-    response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, Accept'
-    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
-    response.headers['Vary'] = 'Origin'
-    return response
+# CORS is handled by Flask-CORS above
 
 # Initialize database on startup
 try:
@@ -197,7 +187,7 @@ def get_catalog():
     return jsonify({"results": movies})
 
 
-@app.route("/api/movies/search", methods=["GET"])
+@app.route("/api/search/all", methods=["GET"])
 def search_movies():
     """Search movies in local database."""
     query = request.args.get("q", "").strip()
@@ -509,50 +499,11 @@ def get_season_episodes_endpoint(season_id):
     return jsonify({"season_id": season_id, "episodes": episodes})
 
 
+# Legacy series search redirected to unified search internally or kept as is
 @app.route("/api/series/search", methods=["GET"])
-def search_series():
-    """Search series by title (only series with at least 1 episode)."""
-    query = request.args.get("q", "").strip()
-    if not query:
-        return jsonify({"results": []})
-    
-    from database import get_conn
-    conn = get_conn()
-    c = conn.cursor()
-    c.execute(
-        """
-        SELECT s.id, s.opera_id, s.tmdb_id, s.title, s.overview, s.poster_path, 
-               s.backdrop_path, s.year, s.genres, s.rating
-        FROM series s
-        WHERE s.title LIKE ? AND s.status = 'active'
-          AND EXISTS (
-              SELECT 1 FROM episodes e 
-              WHERE e.series_id = s.id 
-              LIMIT 1
-          )
-        ORDER BY s.title
-        LIMIT 50
-    """,
-        (f"%{query}%",),
-    )
-    rows = c.fetchall()
-    conn.close()
-    
-    results = []
-    for row in rows:
-        results.append(
-            {
-                "id": row["id"],
-                "title": row["title"],
-                "poster_path": row["poster_path"],
-                "backdrop_path": row["backdrop_path"],
-                "overview": row["overview"],
-                "year": row["year"],
-                "genres": row["genres"],
-                "rating": row["rating"],
-            }
-        )
-    return jsonify({"results": results})
+def search_series_legacy():
+    # Just call the unified search logic for now
+    return search_movies()
 
 
 # ==================== AUTH ENDPOINTS ====================
