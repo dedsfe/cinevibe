@@ -9,7 +9,7 @@ from functools import wraps
 # Password hashing
 from werkzeug.security import generate_password_hash, check_password_hash
 
-# Local modules (to be created below in this patch)
+# Local modules
 from database import (
     init_db,
     init_users_table,
@@ -42,28 +42,19 @@ from database import (
     search_series_locally,
 )
 from scraper import scrape_for_title
-from playwright_scraper import scrape_operatopzera
 from validator import validate_embed
-from bulk_scrape_tmdb import run_bulk_scrape, get_scraper_state
-import requests
 
-TMDB_API_KEY = "909fc389a150847bdd4ffcd92809cff7"
-TMDB_BASE_URL = "https://api.themoviedb.org/3"
-
-# Simple token storage (in production use JWT or sessions)
-# Format: {token: {user_id, expires}}
+# Simple token storage
 active_tokens = {}
 
 def generate_token(user_id):
-    """Generate a simple token for user session."""
     import secrets
     token = secrets.token_urlsafe(32)
-    expires = datetime.utcnow() + timedelta(days=7)  # 7 days
+    expires = datetime.utcnow() + timedelta(days=7)
     active_tokens[token] = {"user_id": user_id, "expires": expires}
     return token
 
 def verify_token(token):
-    """Verify if token is valid and return user_id."""
     if not token or token not in active_tokens:
         return None
     session = active_tokens[token]
@@ -73,37 +64,35 @@ def verify_token(token):
     return session["user_id"]
 
 def require_auth(f):
-    """Decorator to require authentication (DISABLED)."""
     @wraps(f)
     def decorated(*args, **kwargs):
-        # BYPASS AUTH: Always allow and pass dummy user_id=1
         dummy_user_id = 1
         return f(dummy_user_id, *args, **kwargs)
     return decorated
 
 app = Flask(__name__)
-# Enable CORS for all origins (frontend can be on Vercel, Railway, etc.)
-CORS(app, resources={
-    r"/*": {
-        "origins": "*",
-        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-        "allow_headers": ["Content-Type", "Authorization", "Accept"],
-        "supports_credentials": False
-    }
-})
+CORS(app, resources={r"/*": {"origins": "*", "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"], "allow_headers": ["Content-Type", "Authorization", "Accept"]}})
 
-# CORS is handled by Flask-CORS above
+# Global OPTIONS handler
+@app.route('/api/<path:path>', methods=['OPTIONS'])
+def handle_api_options(path):
+    response = app.make_response('')
+    response.status_code = 204
+    origin = request.headers.get('Origin', '*')
+    response.headers['Access-Control-Allow-Origin'] = origin
+    response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, Accept'
+    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
+    return response
 
-# Initialize database on startup
+# Initialize database
 try:
     init_db()
     init_users_table()
-    print("✅ Database initialized successfully")
+    print("✅ Database initialized")
 except Exception as e:
-    print(f"⚠️ Database initialization warning: {e}")
-    logging.warning(f"Database init warning: {e}")
+    print(f"⚠️ DB init warning: {e}
 
-# Create default admin user if no users exist
+# Create default admin
 def create_default_admin():
     try:
         users = get_all_users()
@@ -111,143 +100,23 @@ def create_default_admin():
             password_hash = generate_password_hash("admin123")
             create_user("admin", password_hash, "Administrador", is_admin=True)
             print("✅ Usuário admin criado: admin / admin123")
-            print("   ⚠️  Por segurança, altere a senha após o primeiro login!")
     except Exception as e:
-        print(f"⚠️ Admin creation warning: {e}")
-        logging.warning(f"Admin creation warning: {e}")
+        print(f"⚠️ Admin warning: {e}")
 
 create_default_admin()
 
-
-def search_tmdb(query):
-    """Search TMDB for movies and series."""
-    results = []
-    try:
-        # Search Movies
-        res = requests.get(f"{TMDB_BASE_URL}/search/movie", params={
-            "api_key": TMDB_API_KEY,
-            "query": query,
-            "language": "pt-BR"
-        })
-        if res.status_code == 200:
-            for item in res.json().get("results", []):
-                item["media_type"] = "movie"
-                results.append(item)
-        
-        # Search Series
-        res = requests.get(f"{TMDB_BASE_URL}/search/tv", params={
-            "api_key": TMDB_API_KEY,
-            "query": query,
-            "language": "pt-BR"
-        })
-        if res.status_code == 200:
-            for item in res.json().get("results", []):
-                item["media_type"] = "tv"
-                item["title"] = item.get("name") # TMDB uses 'name' for TV
-                item["release_date"] = item.get("first_air_date")
-                results.append(item)
-    except Exception as e:
-        logging.error(f"TMDB Search Error: {e}")
-    return results
-
-@app.route("/api/search/all", methods=["GET", "POST"])
-def unified_search_all():
-    """Unified search for movies and series, combining local and TMDB results."""
-    query = request.args.get("q", "") or (request.json.get("q") if request.is_json else "")
-    query = query.strip()
-    limit = int(request.args.get("limit", 50))
-    
-    if not query:
-        return jsonify({"results": []})
-        
-    # 1. Search locally
-    local_movies = search_movies_locally(query, limit)
-    local_series = search_series_locally(query, limit)
-    
-    # 2. Combine results (Local Only)
-    final_results = []
-    
-    # Add local results
-    for item in local_movies + local_series:
-        final_results.append(item)
-            
-    # Sort: Exact match -> Alphabetical
-    def sort_key(x):
-        title = x.get('title') or ""
-        exact = 0 if query.lower() == title.lower() else 1
-        return (exact, title.lower())
-    
-    final_results.sort(key=sort_key)
-    
-    return jsonify({"results": final_results[:limit]})
-
-@app.route("/api/debug/ping", methods=["GET"])
-def debug_ping():
-    return jsonify({"message": "pong", "version": "v3.1", "time": datetime.utcnow().isoformat()})
-
+@app.route("/", methods=["GET"])
 def root():
-    """Root endpoint for health checks."""
-    return jsonify({
-        "status": "ok",
-        "message": "Filfil API is running",
-        "endpoints": {
-            "health": "/api/health",
-            "catalog": "/api/catalog",
-            "series": "/api/series",
-            "search": "/api/search/all"
-        }
-    })
-
+    return jsonify({"status": "ok", "message": "Filfil API", "endpoints": ["/api/health", "/api/catalog", "/api/series", "/api/search"]})
 
 @app.route("/api/health", methods=["GET"])
 def health():
     try:
-        # Check database connection
-        from database import get_series_count, get_cache_count
         series_count = get_series_count()
         movie_count = get_cache_count().get("cached_links", 0)
-        
-        return jsonify({
-            "status": "ok",
-            "database": {
-                "series": series_count,
-                "movies": movie_count
-            }
-        })
+        return jsonify({"status": "ok", "database": {"series": series_count, "movies": movie_count}})
     except Exception as e:
-        return jsonify({
-            "status": "error",
-            "message": str(e)
-        }), 500
-
-
-@app.route("/api/cache/stats", methods=["GET"])
-def cache_stats():
-    stats = get_cache_count()
-    return jsonify(
-        {
-            "cached_links": stats.get("cached_links", 0),
-            "tmdb_items": stats.get("tmdb_items", 0),
-        }
-    )
-
-
-@app.route("/api/cache/check-batch", methods=["POST"])
-def check_cache_batch():
-    data = request.get_json(force=True) or {}
-    tmdb_ids = data.get("tmdbIds", [])
-
-    if not tmdb_ids:
-        return jsonify({"statuses": {}})
-
-    statuses = get_cached_statuses(tmdb_ids)
-    return jsonify({"statuses": statuses})
-
-
-@app.route("/api/scraper/status", methods=["GET"])
-def scraper_status():
-    return jsonify(get_scraper_state())
-
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route("/api/catalog", methods=["GET"])
 def get_catalog():
@@ -256,6 +125,28 @@ def get_catalog():
     movies = get_catalog_movies(limit, offset)
     return jsonify({"results": movies})
 
+@app.route("/api/search/all", methods=["GET", "POST"])
+def unified_search_all():
+    """Search movies and series locally."""
+    query = request.args.get("q", "") or (request.json.get("q") if request.is_json else "")
+    query = query.strip()
+    limit = int(request.args.get("limit", 50))
+    
+    if not query:
+        return jsonify({"results": []})
+    
+    try:
+        movies = search_movies_locally(query, limit)
+        series = search_series_locally(query, limit)
+        results = movies + series
+        
+        # Sort by title
+        results.sort(key=lambda x: x.get('title', '').lower())
+        
+        return jsonify({"results": results[:limit]})
+    except Exception as e:
+        logging.error(f"Search error: {e}")
+        return jsonify({"error": str(e)}), 500
 
 @app.route("/api/get-embed", methods=["POST"])
 def get_embed():
@@ -267,520 +158,57 @@ def get_embed():
     if not title:
         return jsonify({"error": "Título é obrigatório"}), 400
 
-    # 1) Check cache by ID first (Most accurate)
+    # Check cache by ID
     if tmdb_id:
         cached_by_id = get_cached_embed_by_id(tmdb_id)
         if cached_by_id and validate_embed(cached_by_id):
             return jsonify({"embedUrl": cached_by_id, "cached": True})
 
-    # 2) Fallback to Title cache
+    # Check cache by title
     cached = get_cached_embed(title)
-    if cached:
-        if validate_embed(cached):
-            return jsonify({"embedUrl": cached, "cached": True})
-        # if cache exists but invalid, continue to scrape
+    if cached and validate_embed(cached):
+        return jsonify({"embedUrl": cached, "cached": True})
 
-    # 3) On-demand scrape from legal sources (Fast)
+    # Scrape
     embed = scrape_for_title(title, tmdb_id, year=year)
     if embed and validate_embed(embed):
         save_embed(title, embed, tmdb_id)
         return jsonify({"embedUrl": embed, "cached": False})
 
-    # 4) Deep Scrape (Slow, but finds everything - e.g. Barbie)
-    logging.info(f"Fast scrape failed for {title}. Attempting deep scrape...")
-    try:
-        deep_embed = scrape_operatopzera(title, year=year)
-        if deep_embed:
-             # Validate merely to be safe, though scraper checks video tag
-             save_embed(title, deep_embed, tmdb_id)
-             return jsonify({"embedUrl": deep_embed, "cached": False})
-    except Exception as e:
-        logging.error(f"Deep scrape failed: {e}")
-
-    return jsonify({"error": "Embed não encontrado. Tente novamente em alguns instantes."}), 404
-
-
-@app.route("/api/proxy-video", methods=["GET"])
-def proxy_video():
-    """Proxies a video URL to bypass Mixed Content/CORS issues."""
-    import requests
-    from flask import Response, stream_with_context
-
-    video_url = request.args.get("url")
-    if not video_url:
-        return jsonify({"error": "URL parameter required"}), 400
-
-    def generate():
-        try:
-            # Forward Range header if present (crucial for seeking)
-            headers = {}
-            if "Range" in request.headers:
-                headers["Range"] = request.headers["Range"]
-
-            # Stream the response from the external server
-            # verify=False is needed because the target cert is invalid (as discovered)
-            with requests.get(video_url, stream=True, headers=headers, verify=False, timeout=10) as r:
-                # Forward important headers back to the client
-                response_headers = {
-                    "Content-Type": r.headers.get("Content-Type", "video/mp4"),
-                    "Content-Length": r.headers.get("Content-Length"),
-                    "Accept-Ranges": "bytes",
-                    "Content-Range": r.headers.get("Content-Range"),
-                }
-                
-                # Create generator response
-                return Response(
-                    stream_with_context(r.iter_content(chunk_size=40960)),
-                    status=r.status_code,
-                    headers={k: v for k, v in response_headers.items() if v}
-                )
-        except Exception as e:
-            logging.error(f"Proxy error: {e}")
-            return jsonify({"error": str(e)}), 500
-
-    return generate()
-
-
-@app.route("/api/scrape-background", methods=["POST"])
-def scrape_background():
-    data = request.get_json(force=True) or {}
-    title = (data.get("title") or "").strip()
-    tmdb_id = data.get("tmdbId")
-
-    if not title:
-        return jsonify({"error": "Título é obrigatório"}), 400
-
-    def background_task(t, tid):
-        logging.info(f"Starting background scrape for: {t}")
-        try:
-            # We don't have year in background task yet, but scraping might infer it or just use title
-            embed = scrape_for_title(t, tid)
-            if embed and validate_embed(embed):
-                save_embed(t, embed, tid)
-                logging.info(f"Background scrape success for: {t}")
-            else:
-                logging.warning(f"Background scrape found nothing for: {t}")
-        except Exception as e:
-            logging.error(f"Background scrape failed for {t}: {e}")
-
-    # Start thread
-    thread = threading.Thread(target=background_task, args=(title, tmdb_id))
-    thread.start()
-
-    return jsonify({"status": "processing", "message": f"Scraping started for {title}"})
-
-
-@app.route("/api/verify-link", methods=["POST"])
-def verify_link():
-    """Verifica se o link de um filme está correto"""
-    data = request.get_json(force=True) or {}
-    title = (data.get("title") or "").strip()
-    current_url = data.get("currentUrl")
-
-    if not title:
-        return jsonify({"error": "Título é obrigatório"}), 400
-
-    from strict_opera_scraper import StrictOperaScraper
-
-    scraper = StrictOperaScraper()
-
-    try:
-        scraper.start_session(headless=True)
-        result = scraper.scrape_with_validation(title)
-
-        # Compare with current URL
-        is_correct = False
-        if current_url and result["success"]:
-            current_id = scraper._extract_video_id(current_url)
-            new_id = result["video_id"]
-            is_correct = current_id == new_id
-
-        return jsonify(
-            {
-                "title": title,
-                "current_url": current_url,
-                "is_correct": is_correct,
-                "scraped_result": {
-                    "success": result["success"],
-                    "video_url": result["video_url"],
-                    "video_id": result["video_id"],
-                    "scraped_title": result["scraped_title"],
-                    "similarity": result["similarity"],
-                    "validation_passed": result["validation_passed"],
-                    "error": result["error"],
-                },
-            }
-        )
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-    finally:
-        scraper.stop_session()
-
-
-@app.route("/api/fix-link", methods=["POST"])
-def fix_link():
-    """Corrige o link de um filme"""
-    data = request.get_json(force=True) or {}
-    title = (data.get("title") or "").strip()
-    tmdb_id = data.get("tmdbId")
-
-    if not title:
-        return jsonify({"error": "Título é obrigatório"}), 400
-
-    from strict_opera_scraper import StrictOperaScraper
-
-    scraper = StrictOperaScraper()
-
-    try:
-        scraper.start_session(headless=True)
-        result = scraper.scrape_with_validation(title)
-
-        if result["success"] and result["validation_passed"]:
-            # Save to database
-            save_embed(title, result["video_url"], tmdb_id)
-
-            return jsonify(
-                {
-                    "success": True,
-                    "message": f"Link corrigido para {title}",
-                    "video_url": result["video_url"],
-                    "video_id": result["video_id"],
-                    "similarity": result["similarity"],
-                }
-            )
-        else:
-            return jsonify(
-                {"success": False, "error": result["error"] or "Falha na validação"}
-            ), 400
-
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-    finally:
-        scraper.stop_session()
-
-
-@app.route("/api/integrity-stats", methods=["GET"])
-def integrity_stats():
-    """Retorna estatísticas de integridade do catálogo"""
-    from database import get_conn
-
-    conn = get_conn()
-    c = conn.cursor()
-
-    # Count by type
-    c.execute("SELECT COUNT(*) FROM links WHERE embed_url IS NOT NULL")
-    total = c.fetchone()[0]
-
-    c.execute("SELECT COUNT(*) FROM links WHERE embed_url != 'NOT_FOUND'")
-    with_links = c.fetchone()[0]
-
-    c.execute("SELECT COUNT(*) FROM links WHERE embed_url = 'NOT_FOUND'")
-    not_found = c.fetchone()[0]
-
-    c.execute("SELECT COUNT(*) FROM links WHERE embed_url LIKE '%jt0x.com%'")
-    opera_links = c.fetchone()[0]
-
-    c.execute("SELECT COUNT(*) FROM links WHERE embed_url LIKE '%youtube%'")
-    youtube_links = c.fetchone()[0]
-
-    conn.close()
-
-    return jsonify(
-        {
-            "total": total,
-            "with_links": with_links,
-            "not_found": not_found,
-            "opera_links": opera_links,
-            "youtube_links": youtube_links,
-            "needs_audit": opera_links,  # All jt0x links should be audited
-        }
-    )
-
-
-# ==================== SERIES ENDPOINTS ====================
+    return jsonify({"error": "Embed não encontrado"}), 404
 
 @app.route("/api/series", methods=["GET"])
 def get_series():
-    """Get catalog of series with pagination."""
     limit = int(request.args.get("limit", 50))
     offset = int(request.args.get("offset", 0))
     series = get_catalog_series(limit, offset)
     total = get_series_count()
     return jsonify({"results": series, "total": total, "limit": limit, "offset": offset})
 
-
 @app.route("/api/series/<int:series_id>", methods=["GET"])
 def get_series_detail(series_id):
-    """Get single series details with all seasons and episodes."""
     series = get_series_by_id(series_id)
     if not series:
         return jsonify({"error": "Série não encontrada"}), 404
     
     seasons = get_series_seasons(series_id)
-    # Get episodes for each season
     for season in seasons:
         season["episodes"] = get_season_episodes(season["id"])
     
     series["seasons"] = seasons
     return jsonify(series)
 
-
-@app.route("/api/series/<int:series_id>/seasons", methods=["GET"])
-def get_series_seasons_endpoint(series_id):
-    """Get all seasons for a series."""
-    series = get_series_by_id(series_id)
-    if not series:
-        return jsonify({"error": "Série não encontrada"}), 404
-    
-    seasons = get_series_seasons(series_id)
-    return jsonify({"series_id": series_id, "seasons": seasons})
-
-
-@app.route("/api/series/seasons/<int:season_id>/episodes", methods=["GET"])
-def get_season_episodes_endpoint(season_id):
-    """Get all episodes for a season."""
-    episodes = get_season_episodes(season_id)
-    return jsonify({"season_id": season_id, "episodes": episodes})
-
-
-# Legacy series search redirected to unified search internally or kept as is
-@app.route("/api/series/search", methods=["GET"])
-def search_series_legacy():
-    # Just call the unified search logic for now
-    return unified_search_all()
-
-
-# ==================== AUTH ENDPOINTS ====================
-
-@app.route("/api/auth/register", methods=["POST"])
-def register():
-    """Register a new user."""
-    data = request.get_json()
-    username = data.get("username", "").strip()
-    password = data.get("password", "").strip()
-    name = data.get("name", "").strip()
-    
-    if not username or not password:
-        return jsonify({"error": "Usuário e senha são obrigatórios"}), 400
-    
-    if len(password) < 4:
-        return jsonify({"error": "Senha deve ter pelo menos 4 caracteres"}), 400
-    
-    # Hash password
-    password_hash = generate_password_hash(password)
-    
-    # Create user
-    user_id = create_user(username, password_hash, name)
-    if not user_id:
-        return jsonify({"error": "Usuário já existe"}), 409
-    
-    return jsonify({"message": "Usuário criado com sucesso", "user_id": user_id}), 201
-
-
-@app.route("/api/auth/login", methods=["POST"])
-def login():
-    """Login user and return token."""
-    data = request.get_json()
-    username = data.get("username", "").strip()
-    password = data.get("password", "").strip()
-    
-    if not username or not password:
-        return jsonify({"error": "Usuário e senha são obrigatórios"}), 400
-    
-    # Get user
-    user = get_user_by_username(username)
-    if not user:
-        return jsonify({"error": "Usuário ou senha incorretos"}), 401
-    
-    # Check password
-    if not check_password_hash(user["password_hash"], password):
-        return jsonify({"error": "Usuário ou senha incorretos"}), 401
-    
-    # Update last login
-    update_last_login(user["id"])
-    
-    # Generate token
-    token = generate_token(user["id"])
-    
-    return jsonify({
-        "message": "Login realizado com sucesso",
-        "token": token,
-        "user": {
-            "id": user["id"],
-            "username": user["username"],
-            "name": user["name"],
-            "is_admin": user["is_admin"]
-        }
-    })
-
-
-@app.route("/api/auth/me", methods=["GET"])
-@require_auth
-def get_current_user(user_id):
-    """Get current user info."""
-    from database import get_conn
-    conn = get_conn()
-    c = conn.cursor()
-    c.execute("SELECT id, username, name, is_admin FROM users WHERE id = ?", (user_id,))
-    row = c.fetchone()
-    conn.close()
-    
-    if not row:
-        return jsonify({"error": "Usuário não encontrado"}), 404
-    
-    return jsonify({
-        "id": row["id"],
-        "username": row["username"],
-        "name": row["name"],
-        "is_admin": bool(row["is_admin"])
-    })
-
-
-@app.route("/api/admin/scraper/status", methods=["GET"])
-def get_scraper_status_api():
-    """Get the current state of the background scraper."""
-    return jsonify(get_scraper_state())
-
-@app.route("/api/admin/scraper/start", methods=["POST"])
-def start_scraper_api():
-    """Manually trigger the background scraper if not running."""
-    state = get_scraper_state()
-    if state["is_running"]:
-        return jsonify({"message": "Scraper already running", "status": "active"}), 200
-    
-    # Start in background
-    thread = threading.Thread(target=run_bulk_scrape, daemon=True)
-    thread.start()
-    return jsonify({"message": "Scraper started in background", "status": "started"}), 201
-
-@app.route("/api/admin/scrape/title", methods=["POST"])
-def scrape_specific_title():
-    """Trigger a scrape for a specific title."""
-    data = request.get_json(force=True) or {}
-    title = data.get("title")
-    tmdb_id = data.get("tmdb_id")
-    year = data.get("year")
-    
-    if not title:
-        return jsonify({"error": "Title is required"}), 400
-        
-    logging.info(f"On-demand scrape requested for: {title}")
-    
-    # Start in background thread to avoid timeout
-    def on_demand_worker():
-        try:
-            embed = scrape_for_title(title, tmdb_id, year=year)
-            if embed:
-                save_embed(title, embed, tmdb_id, year=year)
-                logging.info(f"Successfully scraped and saved: {title}")
-            else:
-                logging.warning(f"Failed to find embed for: {title}")
-        except Exception as e:
-            logging.error(f"On-demand scrape error for {title}: {e}")
-
-    thread = threading.Thread(target=on_demand_worker, daemon=True)
-    thread.start()
-    
-    return jsonify({"message": f"Scrape initiated for {title}", "status": "initiated"}), 202
-
-@app.route("/api/admin/scraper/stop", methods=["POST"])
-def stop_scraper_api():
-    """Request the scraper to stop (not implemented in the loop yet, but state updated)."""
-    # This would require adding a stop event to the bulk scrape loop
-    return jsonify({"message": "Stop requested (not fully implemented yet)", "status": "requested"}), 202
-
-
-# ==================== PROTECTED MY LIST ENDPOINTS ====================
-
 @app.route("/api/mylist/movies", methods=["GET"])
-@require_auth
-def get_user_movie_list(user_id):
-    """Get user's movie list."""
-    movies = get_my_list_movies(user_id)
-    return jsonify({"results": movies, "count": len(movies)})
-
-
-@app.route("/api/mylist/movies", methods=["POST"])
-@require_auth
-def add_movie_to_list(user_id):
-    """Add movie to user's list."""
-    data = request.get_json()
-    success = add_to_my_list_movies(user_id, data)
-    if success:
-        return jsonify({"message": "Filme adicionado à lista"}), 201
-    return jsonify({"error": "Filme já está na lista"}), 409
-
-
-@app.route("/api/mylist/movies/<movie_id>", methods=["DELETE"])
-@require_auth
-def remove_movie_from_list(user_id, movie_id):
-    """Remove movie from user's list."""
-    success = remove_from_my_list_movies(user_id, movie_id)
-    if success:
-        return jsonify({"message": "Filme removido da lista"})
-    return jsonify({"error": "Filme não encontrado na lista"}), 404
-
-
-@app.route("/api/mylist/movies/<movie_id>/check", methods=["GET"])
-@require_auth
-def check_movie_in_list(user_id, movie_id):
-    """Check if movie is in user's list."""
-    is_in_list = is_in_my_list_movies(user_id, movie_id)
-    return jsonify({"in_list": is_in_list})
-
+def get_my_list_movies_endpoint():
+    movies = get_my_list_movies(1)  # dummy user_id
+    return jsonify({"results": movies})
 
 @app.route("/api/mylist/series", methods=["GET"])
-@require_auth
-def get_user_series_list(user_id):
-    """Get user's series list."""
-    series = get_my_list_series(user_id)
-    return jsonify({"results": series, "count": len(series)})
-
-
-@app.route("/api/mylist/series", methods=["POST"])
-@require_auth
-def add_series_to_list(user_id):
-    """Add series to user's list."""
-    data = request.get_json()
-    series_id = data.get("series_id")
-    if not series_id:
-        return jsonify({"error": "ID da série é obrigatório"}), 400
-    
-    success = add_to_my_list_series(user_id, series_id)
-    if success:
-        return jsonify({"message": "Série adicionada à lista"}), 201
-    return jsonify({"error": "Série já está na lista"}), 409
-
-
-@app.route("/api/mylist/series/<int:series_id>", methods=["DELETE"])
-@require_auth
-def remove_series_from_list(user_id, series_id):
-    """Remove series from user's list."""
-    success = remove_from_my_list_series(user_id, series_id)
-    if success:
-        return jsonify({"message": "Série removida da lista"})
-    return jsonify({"error": "Série não encontrada na lista"}), 404
-
-
-@app.route("/api/mylist/series/<int:series_id>/check", methods=["GET"])
-@require_auth
-def check_series_in_list(user_id, series_id):
-    """Check if series is in user's list."""
-    is_in_list = is_in_my_list_series(user_id, series_id)
-    return jsonify({"in_list": is_in_list})
-
+def get_my_list_series_endpoint():
+    series = get_my_list_series(1)
+    return jsonify({"results": series})
 
 if __name__ == "__main__":
-    # Start auto-precache in background (daemon thread so it doesn't block exit)
-    logging.info("Starting background auto-precache task...")
-    # threading.Thread(target=run_bulk_scrape, daemon=True).start()
-
-    # Run locally on 127.0.0.1:8080 (or from PORT env var)
-    # Port 5000 is used by macOS AirPlay, so we use 8080
     port = int(os.environ.get("PORT", 8080))
-    print(f"\n🚀 Flask server starting on http://127.0.0.1:{port}/")
-    print(f"   API endpoints available:")
-    print(f"   - http://127.0.0.1:{port}/api/health")
-    print(f"   - http://127.0.0.1:{port}/api/catalog")
-    print(f"   - http://127.0.0.1:{port}/api/series\n")
-    app.run(host="127.0.0.1", port=port, debug=False)
+    print(f"🚀 Server: http://127.0.0.1:{port}/")
+    app.run(host="0.0.0.0", port=port, debug=False)
