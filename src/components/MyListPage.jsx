@@ -3,7 +3,6 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Heart, Film, Tv, Trash2 } from 'lucide-react';
-import { useAuth } from '../contexts/AuthContext';
 import Navbar from './Navbar';
 import SearchModal from './SearchModal';
 import MovieCard from './MovieCard';
@@ -17,7 +16,6 @@ const MyListPage = () => {
     const [loading, setLoading] = useState(true);
     const [isSearchOpen, setIsSearchOpen] = useState(false);
     const [selectedItem, setSelectedItem] = useState(null);
-    const { getAuthHeaders } = useAuth();
     const navigate = useNavigate();
 
     useEffect(() => {
@@ -27,22 +25,47 @@ const MyListPage = () => {
     const loadMyList = async () => {
         setLoading(true);
         try {
-            // Fetch movies from API
-            const moviesResponse = await fetch(`${API_BASE_URL}/mylist/movies`, {
-                headers: getAuthHeaders()
-            });
-            if (moviesResponse.ok) {
-                const moviesData = await moviesResponse.json();
-                setMyListMovies(moviesData.results || []);
+            // Load movies from localStorage
+            const movieIds = JSON.parse(localStorage.getItem('mylist_movies') || '[]');
+            if (movieIds.length > 0) {
+                // Fetch movie details from API
+                const movies = [];
+                for (const id of movieIds) {
+                    try {
+                        const response = await fetch(`${API_BASE_URL}/cache/check-batch`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ tmdbIds: [id] })
+                        });
+                        if (response.ok) {
+                            const data = await response.json();
+                            if (data.statuses && data.statuses[String(id)]) {
+                                movies.push({ id, embedUrl: data.statuses[String(id)] });
+                            }
+                        }
+                    } catch (e) {
+                        console.error('Error fetching movie:', e);
+                    }
+                }
+                setMyListMovies(movies);
             }
 
-            // Fetch series from API
-            const seriesResponse = await fetch(`${API_BASE_URL}/mylist/series`, {
-                headers: getAuthHeaders()
-            });
-            if (seriesResponse.ok) {
-                const seriesData = await seriesResponse.json();
-                setMyListSeries(seriesData.results || []);
+            // Load series from localStorage
+            const seriesIds = JSON.parse(localStorage.getItem('mylist_series') || '[]');
+            if (seriesIds.length > 0) {
+                const series = [];
+                for (const id of seriesIds) {
+                    try {
+                        const response = await fetch(`${API_BASE_URL}/series/${id}`);
+                        if (response.ok) {
+                            const data = await response.json();
+                            series.push(data);
+                        }
+                    } catch (e) {
+                        console.error('Error fetching series:', e);
+                    }
+                }
+                setMyListSeries(series);
             }
         } catch (error) {
             console.error('Error loading my list:', error);
@@ -51,26 +74,18 @@ const MyListPage = () => {
         }
     };
 
-    const removeFromList = async (item, type) => {
+    const removeFromList = (item, type) => {
         try {
-            let url;
             if (type === 'movie') {
-                url = `${API_BASE_URL}/mylist/movies/${item.id}`;
+                const myList = JSON.parse(localStorage.getItem('mylist_movies') || '[]');
+                const newList = myList.filter(id => id !== item.id);
+                localStorage.setItem('mylist_movies', JSON.stringify(newList));
+                setMyListMovies(prev => prev.filter(m => m.id !== item.id));
             } else {
-                url = `${API_BASE_URL}/mylist/series/${item.id}`;
-            }
-
-            const response = await fetch(url, {
-                method: 'DELETE',
-                headers: getAuthHeaders()
-            });
-
-            if (response.ok) {
-                if (type === 'movie') {
-                    setMyListMovies(prev => prev.filter(m => m.id !== item.id));
-                } else {
-                    setMyListSeries(prev => prev.filter(s => s.id !== item.id));
-                }
+                const myList = JSON.parse(localStorage.getItem('mylist_series') || '[]');
+                const newList = myList.filter(id => id !== item.id);
+                localStorage.setItem('mylist_series', JSON.stringify(newList));
+                setMyListSeries(prev => prev.filter(s => s.id !== item.id));
             }
         } catch (error) {
             console.error('Error removing from list:', error);

@@ -3,7 +3,6 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Play, Plus, Check, Star, Volume2, VolumeX, ChevronDown } from 'lucide-react';
 import { useTMDB, getBackdropUrl, getPosterUrl, genreMap } from '../hooks/useTMDB';
-import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import '../styles/MovieDetailsModal.css';
 
@@ -34,7 +33,6 @@ const MovieDetailsModal = ({ movie, onClose }) => {
   const [loadingSeries, setLoadingSeries] = useState(false);
   const iframeRef = React.useRef(null);
   const { fetchData } = useTMDB();
-  const { getAuthHeaders } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -42,15 +40,10 @@ const MovieDetailsModal = ({ movie, onClose }) => {
       // Verificar se é uma série da nossa base (tem opera_id)
       if (movie.opera_id) {
         setIsSeries(true);
-        // Check if series is in my list via API
+        // Check if series is in my list (localStorage for now)
         try {
-          const response = await fetch(`${API_BASE_URL}/mylist/series/${movie.id}/check`, {
-            headers: getAuthHeaders()
-          });
-          if (response.ok) {
-            const data = await response.json();
-            setInList(data.in_list);
-          }
+          const myList = JSON.parse(localStorage.getItem('mylist_series') || '[]');
+          setInList(myList.includes(movie.id));
         } catch (e) {
           console.error('Error checking series in list:', e);
         }
@@ -58,15 +51,10 @@ const MovieDetailsModal = ({ movie, onClose }) => {
         return;
       }
 
-      // Check if in list via API
+      // Check if in list (localStorage for now)
       try {
-        const response = await fetch(`${API_BASE_URL}/mylist/movies/${movie.id}/check`, {
-          headers: getAuthHeaders()
-        });
-        if (response.ok) {
-          const data = await response.json();
-          setInList(data.in_list);
-        }
+        const myList = JSON.parse(localStorage.getItem('mylist_movies') || '[]');
+        setInList(myList.includes(movie.id));
       } catch (e) {
         console.error('Error checking movie in list:', e);
       }
@@ -174,55 +162,33 @@ const MovieDetailsModal = ({ movie, onClose }) => {
 
   const handleToggleList = async () => {
     if (isSeries) {
-      // Handle series via API
+      // Handle series via localStorage
       try {
+        const myList = JSON.parse(localStorage.getItem('mylist_series') || '[]');
         if (inList) {
-          const response = await fetch(`${API_BASE_URL}/mylist/series/${movie.id}`, {
-            method: 'DELETE',
-            headers: getAuthHeaders()
-          });
-          if (response.ok) {
-            setInList(false);
-          }
+          const newList = myList.filter(id => id !== movie.id);
+          localStorage.setItem('mylist_series', JSON.stringify(newList));
+          setInList(false);
         } else {
-          const response = await fetch(`${API_BASE_URL}/mylist/series`, {
-            method: 'POST',
-            headers: {
-              ...getAuthHeaders(),
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ series_id: movie.id })
-          });
-          if (response.ok) {
-            setInList(true);
-          }
+          myList.push(movie.id);
+          localStorage.setItem('mylist_series', JSON.stringify(myList));
+          setInList(true);
         }
       } catch (e) {
         console.error('Error toggling series in list:', e);
       }
     } else {
-      // Handle movies via API
+      // Handle movies via localStorage
       try {
+        const myList = JSON.parse(localStorage.getItem('mylist_movies') || '[]');
         if (inList) {
-          const response = await fetch(`${API_BASE_URL}/mylist/movies/${movie.id}`, {
-            method: 'DELETE',
-            headers: getAuthHeaders()
-          });
-          if (response.ok) {
-            setInList(false);
-          }
+          const newList = myList.filter(id => id !== movie.id);
+          localStorage.setItem('mylist_movies', JSON.stringify(newList));
+          setInList(false);
         } else {
-          const response = await fetch(`${API_BASE_URL}/mylist/movies`, {
-            method: 'POST',
-            headers: {
-              ...getAuthHeaders(),
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(movie)
-          });
-          if (response.ok) {
-            setInList(true);
-          }
+          myList.push(movie.id);
+          localStorage.setItem('mylist_movies', JSON.stringify(myList));
+          setInList(true);
         }
       } catch (e) {
         console.error('Error toggling movie in list:', e);
