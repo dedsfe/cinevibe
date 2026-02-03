@@ -98,17 +98,26 @@ def handle_api_options(path):
     return response
 
 # Initialize database on startup
-init_db()
-init_users_table()
+try:
+    init_db()
+    init_users_table()
+    print("✅ Database initialized successfully")
+except Exception as e:
+    print(f"⚠️ Database initialization warning: {e}")
+    logging.warning(f"Database init warning: {e}")
 
 # Create default admin user if no users exist
 def create_default_admin():
-    users = get_all_users()
-    if not users:
-        password_hash = generate_password_hash("admin123")
-        create_user("admin", password_hash, "Administrador", is_admin=True)
-        print("✅ Usuário admin criado: admin / admin123")
-        print("   ⚠️  Por segurança, altere a senha após o primeiro login!")
+    try:
+        users = get_all_users()
+        if not users:
+            password_hash = generate_password_hash("admin123")
+            create_user("admin", password_hash, "Administrador", is_admin=True)
+            print("✅ Usuário admin criado: admin / admin123")
+            print("   ⚠️  Por segurança, altere a senha após o primeiro login!")
+    except Exception as e:
+        print(f"⚠️ Admin creation warning: {e}")
+        logging.warning(f"Admin creation warning: {e}")
 
 create_default_admin()
 
