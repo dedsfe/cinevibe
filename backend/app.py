@@ -85,11 +85,9 @@ CORS(app, resources={
     }
 })
 
-# Handle OPTIONS preflight manually to ensure 204 response
-@app.route('/api/auth/login', methods=['OPTIONS'])
-@app.route('/api/auth/register', methods=['OPTIONS'])
-@app.route('/api/auth/me', methods=['OPTIONS'])
-def handle_options():
+# Global OPTIONS handler for all API routes
+@app.route('/api/<path:path>', methods=['OPTIONS'])
+def handle_api_options(path):
     response = app.make_response('')
     response.status_code = 204
     origin = request.headers.get('Origin', '*')
