@@ -115,7 +115,32 @@ def create_default_admin():
 create_default_admin()
 
 
-@app.route("/", methods=["GET"])
+@app.route("/api/search/all", methods=["GET", "POST"])
+def unified_search_all():
+    """Unified search for movies and series."""
+    query = request.args.get("q", "") or (request.json.get("q") if request.is_json else "")
+    query = query.strip()
+    limit = int(request.args.get("limit", 50))
+    
+    if not query:
+        return jsonify({"results": []})
+        
+    movies = search_movies_locally(query, limit)
+    series = search_series_locally(query, limit)
+    
+    # Combined results
+    results = movies + series
+    
+    # Sort combined by exact match first if needed, or by title
+    def sort_key(x):
+        title = x.get('title') or ""
+        exact = 0 if query.lower() in title.lower() else 1
+        return (exact, title.lower())
+    
+    results.sort(key=sort_key)
+    
+    return jsonify({"results": results[:limit]})
+
 def root():
     """Root endpoint for health checks."""
     return jsonify({
@@ -185,32 +210,6 @@ def get_catalog():
     offset = int(request.args.get("offset", 0))
     movies = get_catalog_movies(limit, offset)
     return jsonify({"results": movies})
-
-
-@app.route("/api/search/all", methods=["GET"])
-def search_movies():
-    """Search movies in local database."""
-    query = request.args.get("q", "").strip()
-    limit = int(request.args.get("limit", 50))
-    
-    if not query:
-        return jsonify({"results": []})
-        
-    movies = search_movies_locally(query, limit)
-    series = search_series_locally(query, limit)
-    
-    # Combined results
-    results = movies + series
-    
-    # Sort combined by exact match first if needed, or by title
-    def sort_key(x):
-        title = x.get('title') or ""
-        exact = 0 if query.lower() in title.lower() else 1
-        return (exact, title.lower())
-    
-    results.sort(key=sort_key)
-    
-    return jsonify({"results": results[:limit]})
 
 
 @app.route("/api/get-embed", methods=["POST"])
@@ -503,7 +502,7 @@ def get_season_episodes_endpoint(season_id):
 @app.route("/api/series/search", methods=["GET"])
 def search_series_legacy():
     # Just call the unified search logic for now
-    return search_movies()
+    return unified_search_all()
 
 
 # ==================== AUTH ENDPOINTS ====================
