@@ -9,6 +9,7 @@ const SearchModal = ({ onClose, onMovieClick }) => {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [error, setError] = useState(null);
   const [availability, setAvailability] = useState({});
   const { fetchData } = useTMDB();
   const inputRef = useRef(null);
@@ -39,13 +40,22 @@ const SearchModal = ({ onClose, onMovieClick }) => {
     const timer = setTimeout(async () => {
       if (!query.trim()) {
         setResults([]);
+        setError(null);
         return;
       }
 
       setIsSearching(true);
+      setError(null);
       try {
+        console.log(`Searching for: ${query} at ${API_BASE_URL}`);
         // Search exclusively in local database
-        const response = await fetch(`${API_BASE_URL}/api/movies/search?q=${encodeURIComponent(query)}`);
+        // API_BASE_URL already ends with /api
+        const response = await fetch(`${API_BASE_URL}/movies/search?q=${encodeURIComponent(query)}`);
+        
+        if (!response.ok) {
+          throw new Error(`Server Error: ${response.status}`);
+        }
+        
         const data = await response.json();
         
         if (data?.results) {
@@ -54,13 +64,17 @@ const SearchModal = ({ onClose, onMovieClick }) => {
           const availMap = {};
           data.results.forEach(m => availMap[m.id] = true);
           setAvailability(availMap);
+        } else {
+          setResults([]);
         }
-      } catch (error) {
-        console.error("Search failed", error);
+      } catch (err) {
+        console.error("Search failed", err);
+        setError("Backend offline ou endereço incorreto (VITE_API_URL)");
+        setResults([]);
       } finally {
         setIsSearching(false);
       }
-    }, 500);
+    }, 300);
 
     return () => clearTimeout(timer);
   }, [query]);
@@ -101,9 +115,9 @@ const SearchModal = ({ onClose, onMovieClick }) => {
             </div>
           ) : results.length > 0 ? (
             <div className="search-results-list">
-              {results.map(movie => (
+              {results.map((movie, idx) => (
                 <div 
-                  key={movie.id} 
+                  key={movie.id || `result-${idx}`} 
                   className="search-result-item"
                   onClick={() => {
                     onMovieClick(movie);
@@ -115,16 +129,18 @@ const SearchModal = ({ onClose, onMovieClick }) => {
                     alt={movie.title} 
                     className="search-result-poster"
                   />
-                    <div className="search-result-info">
+                  <div className="search-result-info">
                     <h4>{movie.title}</h4>
                     <span className="search-result-year">
-                      {(movie.release_date || '').substring(0, 4)}
+                      {String(movie.release_date || '').substring(0, 4)}
                     </span>
                     <span className="search-result-badge">⚡️ Disponível</span>
                   </div>
                 </div>
               ))}
             </div>
+          ) : error ? (
+            <div className="search-modal-empty" style={{ color: '#ff4444' }}>{error}</div>
           ) : query ? (
             <div className="search-modal-empty">Nenhum resultado encontrado</div>
           ) : (

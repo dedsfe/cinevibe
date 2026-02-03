@@ -213,7 +213,12 @@ def search_movies():
     results = movies + series
     
     # Sort combined by exact match first if needed, or by title
-    results.sort(key=lambda x: (0 if query.lower() in x['title'].lower() else 1, x['title']))
+    def sort_key(x):
+        title = x.get('title') or ""
+        exact = 0 if query.lower() in title.lower() else 1
+        return (exact, title.lower())
+    
+    results.sort(key=sort_key)
     
     return jsonify({"results": results[:limit]})
 

@@ -240,7 +240,7 @@ def search_movies_locally(query: str, limit=50):
         # Search by title, ensuring we only get items with valid embeds
         c.execute(
             """
-            SELECT tmdb_id, title, embed_url, poster_path, backdrop_path, overview, year, added_at
+            SELECT id, tmdb_id, title, embed_url, poster_path, backdrop_path, overview, year, added_at
             FROM links
             WHERE title LIKE ? 
               AND embed_url IS NOT NULL 
@@ -258,13 +258,13 @@ def search_movies_locally(query: str, limit=50):
         for row in rows:
             results.append(
                 {
-                    "id": row["tmdb_id"],  # Keep as string/mixed
+                    "id": row["tmdb_id"] or f"local_{row['id']}",
                     "title": row["title"],
                     "poster_path": row["poster_path"],
                     "backdrop_path": row["backdrop_path"],
                     "overview": row["overview"],
                     "release_date": row["year"] or "", 
-                    "isAvailable": True,  # By definition, these are available
+                    "isAvailable": True,
                     "embedUrl": row["embed_url"],
                 }
             )
