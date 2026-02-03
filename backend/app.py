@@ -141,6 +141,10 @@ def unified_search_all():
     
     return jsonify({"results": results[:limit]})
 
+@app.route("/api/debug/ping", methods=["GET"])
+def debug_ping():
+    return jsonify({"message": "pong", "version": "v3.1", "time": datetime.utcnow().isoformat()})
+
 def root():
     """Root endpoint for health checks."""
     return jsonify({
